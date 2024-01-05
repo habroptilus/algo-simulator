@@ -1,10 +1,13 @@
 import random
-from typing import List, Optional
+from typing import List, Optional, Tuple
 COLORS = ['B', 'W']
 MIN_NUMBER = 0
 MAX_NUMBER = 11
 NUMBERS = list(range(MAX_NUMBER+1))
 MAX_HANDS = 4
+PLAYERS_NUM = 2
+PLAYER_ID_LIST = list(range(PLAYERS_NUM))
+MAX_TURNS = 10
 
 
 class CardContent:
@@ -71,6 +74,17 @@ class Card:
         return str(self.__content)
 
 
+class Attack:
+    def __init__(self, position: int, color: str, number: int, attacked_to: int, attacked_by: int):
+        self.position = position
+        self.card_content = CardContent(color=color, number=number)
+        self.attacked_to = attacked_to
+        self.attacked_by = attacked_by
+
+    def __repr__(self) -> str:
+        return f"{card_content} at {self.position} (Player{self.attacked_by} -> Player{self.attacked_to})"
+
+
 class CardList:
     def __init__(self, cards: List[Card]):
         self.cards = cards
@@ -97,13 +111,6 @@ class Deck(CardList):
         return card
 
 
-class Attack:
-    def __init__(self, position: int, color: str, number: int, attacked_to: int):
-        self.position = position
-        self.card_content = CardContent(color=color, number=number)
-        self.attacked_to = attacked_to
-
-
 class Hands(CardList):
     def __init__(self, cards: List[Card]):
         self.cards: List[Card] = sorted(cards)
@@ -124,6 +131,15 @@ class Hands(CardList):
         # original item is overwritten.
         target_card.open()
 
+    def get_closed_cards(self):
+        return [(i, card.get_color()) for i, card in enumerate(self.cards) if not card.opened]
+
+    def get_contents(self, referred_by: int) -> List[CardContent]:
+        return [card.get_content(referred_by=referred_by) for card in self.cards]
+
+    def is_loser(self) -> bool:
+        return all([card.opened for card in self.cards])
+
 
 class Player:
     def __init__(self, player_id: int, hands: Hands):
@@ -132,16 +148,6 @@ class Player:
 
     def __repr__(self) -> str:
         return f"Player{self.player_id}\n{self.hands}"
-
-
-class History:
-    def __init__(self, attacks: Optional[List[Attack]]):
-        if attacks is not None:
-            self.attacks = attacks
-        self.attacks = []
-
-    def add(self, attack: Attack):
-        self.attacks.append(attack)
 
 
 def init_player(deck: Deck, player_id: int, max_hands: int) -> Player:
@@ -153,26 +159,63 @@ def init_player(deck: Deck, player_id: int, max_hands: int) -> Player:
 if __name__ == '__main__':
     deck = Deck(colors=COLORS, numbers=NUMBERS)
 
-    player_id_list = [1, 2]
     players = [init_player(deck=deck, player_id=player_id,
-                           max_hands=MAX_HANDS) for player_id in player_id_list]
-
+                           max_hands=MAX_HANDS) for player_id in PLAYER_ID_LIST]
+    history = []
+    opened_cards = []
+    losers = 0
     player: Player = players[0]
     opponent: Player = players[1]
+    attacker = 0
+    for turn in range(MAX_TURNS):
+        for player in players:
+            print(f"Player{player.player_id}: {player.hands.debug()}")
+        player = players[attacker]
+        print(f"Turn{turn+1} Attacker: Player{player.player_id}")
+        # TODO: support multiple opponents
+        opponent = players[(attacker+1) % 2]
 
-    new_card = deck.draw(player_id=player.player_id)
-    print(new_card.get_content(referred_by=player.player_id))
-    # TODO: Generate Attack via calculation
-    attack = Attack(position=0, color='B', number=2,
-                    attacked_to=opponent.player_id)
-    result = opponent.hands.judge(attack=attack)
-    if result:
-        opponent.hands.open(position=attack.position)
-        # TODO: Implement Re-attack process after attack success.
-    else:
-        new_card.opened = True
+        print("Draw")
+        new_card = deck.draw(player_id=player.player_id)
+        new_card_content = new_card.get_content(referred_by=player.player_id)
+        print(new_card_content)
+        # Generate Attack via calculation
+        candidates: List[Tuple[int, CardContent]] = []
+        # TODO: support multiple opponents
+        closed_cards = opponent.hands.get_closed_cards()
+        owned_by_self = player.hands.get_contents(referred_by=player.player_id)
+        impossible_cards = opened_cards + owned_by_self + [new_card_content]
+        for position, color in closed_cards:
+            candidates += [
+                (position, candidate) for candidate in [CardContent(color=color, number=number)
+                                                        for number in NUMBERS] if candidate not in impossible_cards]
+        position, card_content = random.choice(candidates)
+        attack = Attack(position=position, color=card_content.color, number=card_content.number,
+                        attacked_to=opponent.player_id, attacked_by=player.player_id)
 
-    player.hands.add(new_card)
+        print(attack)
+        # Apply attack
+        history.append(attack)
+        result = opponent.hands.judge(attack=attack)
+        if result:
+            print("Success!")
+            opponent.hands.open(position=attack.position)
+            opened_cards.append(CardContent(
+                color=attack.card_content.color, number=attack.card_content.number))
+            # Judge whether the game is over or not
+            if opponent.hands.is_loser():
+                losers += 1
+                if losers == PLAYERS_NUM-1:
+                    print(
+                        f"The game is over! Winner: Player{player.player_id}.")
+                    break
 
-    print(player)
-    print(player.hands.debug())
+            # TODO: Implement Re-attack process after attack success.
+        else:
+            print("Failed...")
+            new_card.opened = True
+
+        player.hands.add(new_card)
+
+        # switch attacker
+        attacker = (attacker+1) % 2
