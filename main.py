@@ -107,8 +107,10 @@ class Deck(CardList):
                  for color in colors for number in numbers]
         self.cards: List[Card] = random.sample(cards, len(cards))
 
-    def draw(self, player_id: int):
+    def draw(self, player_id: int) -> Optional[Card]:
         # TODO: If the deck is empty, continue without new_card.
+        if len(self.cards) == 0:
+            return
         card = self.cards.pop()
         card.owned_by = player_id
         return card
@@ -165,18 +167,20 @@ def init_player(deck: Deck, player_id: int, max_hands: int) -> Player:
     return Player(player_id=player_id, hands=hands)
 
 
-def get_attack(player: Player, opponents: List[Player], new_card: CardContent,
+def get_attack(player: Player, opponents: List[Player], new_card: Optional[CardContent],
                all_opened_cards: List[CardContent], has_succeeded: bool, skip_second_attack: bool = False) -> Optional[Attack]:
+    # TODO: Consider history.
     if has_succeeded and skip_second_attack:
         # In this logic, if your previous attack was successful, you skip the next attack.
         return
-
     attack_candidates: List[Attack] = []
     for opponent in opponents:
         closed_cards = opponent.hands.get_closed_cards()
         opened_cards = opponent.hands.get_opened_cards()
         owned_by_self = player.hands.get_contents(referred_by=player.player_id)
-        impossible_cards = all_opened_cards + owned_by_self + [new_card]
+        impossible_cards = all_opened_cards + owned_by_self
+        if new_card is not None:
+            impossible_cards.append(new_card)
         for position, color in closed_cards:
             candidates = [CardContent(color=color, number=number)
                           for number in NUMBERS]
@@ -239,16 +243,18 @@ class Game:
         for turn in range(self.max_turns):
             for player in players:
                 print(player)
-                print(player.debug())
             player = players[attacker]
             print(f"Turn{turn+1} Attacker: Player{player.player_id}")
             opponents = [
                 player for player in players if player.player_id != attacker]
 
             new_card = deck.draw(player_id=player.player_id)
-            new_card_content = new_card.get_content(
-                referred_by=player.player_id)
-            print(f"Draw: {new_card_content}")
+            if new_card is None:
+                print("deck is empty.")
+            else:
+                new_card_content = new_card.get_content(
+                    referred_by=player.player_id)
+                print(f"Draw: {new_card_content}")
 
             has_succeeded = False
             while True:
@@ -283,14 +289,16 @@ class Game:
                         if losers == PLAYERS_NUM-1:
                             print(
                                 f"The game is over! Winner: Player{player.player_id}.")
-                            return
+                            return player.player_id
 
                 else:
                     print("Failed...")
-                    new_card.opened = True
+                    if new_card is not None:
+                        new_card.opened = True
                     break
 
-            player.hands.add(new_card)
+            if new_card is not None:
+                player.hands.add(new_card)
 
             # switch attacker
             attacker = (attacker+1) % PLAYERS_NUM
