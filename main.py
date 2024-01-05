@@ -3,12 +3,13 @@ from typing import List, Optional, Tuple
 COLORS = ['B', 'W']
 MIN_NUMBER = 0
 MAX_NUMBER = 11
-NUMBERS = list(range(MAX_NUMBER+1))
+NUMBERS = list(range(MIN_NUMBER, MAX_NUMBER+1))
 MAX_HANDS = 4
 PLAYERS_NUM = 2
 PLAYER_ID_LIST = list(range(PLAYERS_NUM))
 
 START_ATTACKER = 0
+MAX_TURNS = 100
 
 
 class CardContent:
@@ -164,12 +165,12 @@ def init_player(deck: Deck, player_id: int, max_hands: int) -> Player:
     return Player(player_id=player_id, hands=hands)
 
 
-def get_attack(player: Player, opponents: List[Player], new_card: CardContent, all_opened_cards: List[CardContent], has_succeeded: bool) -> Optional[Attack]:
-    if has_succeeded:
+def get_attack(player: Player, opponents: List[Player], new_card: CardContent,
+               all_opened_cards: List[CardContent], has_succeeded: bool, skip_second_attack: bool = False) -> Optional[Attack]:
+    if has_succeeded and skip_second_attack:
         # In this logic, if your previous attack was successful, you skip the next attack.
         return
 
-    # TODO: Consider the order of the hands
     attack_candidates: List[Attack] = []
     for opponent in opponents:
         closed_cards = opponent.hands.get_closed_cards()
@@ -210,6 +211,7 @@ def get_bounds(opened_cards: List[Tuple[int, CardContent]], target: int) -> Tupl
 
     index_target = sorted_list.index((target, None))
 
+    # TODO: Refactor by defining new type instead of tuple
     lower_bound = sorted_list[index_target -
                               1][1] if index_target > 0 else None
     upper_bound = sorted_list[index_target +
@@ -218,70 +220,84 @@ def get_bounds(opened_cards: List[Tuple[int, CardContent]], target: int) -> Tupl
     return lower_bound, upper_bound
 
 
+class Game:
+    def __init__(self, colors, numbers, max_turns, start_attacker):
+        self.colors = colors
+        self.numbers = numbers
+        self.max_turns = max_turns
+        self.start_attacker = start_attacker
+
+    def start(self):
+        deck = Deck(colors=self.colors, numbers=self.numbers)
+
+        players = [init_player(deck=deck, player_id=player_id,
+                               max_hands=MAX_HANDS) for player_id in PLAYER_ID_LIST]
+        history = []
+        opened_cards = []
+        losers = 0
+        attacker = self.start_attacker
+        for turn in range(self.max_turns):
+            for player in players:
+                print(player)
+                print(player.debug())
+            player = players[attacker]
+            print(f"Turn{turn+1} Attacker: Player{player.player_id}")
+            opponents = [
+                player for player in players if player.player_id != attacker]
+
+            new_card = deck.draw(player_id=player.player_id)
+            new_card_content = new_card.get_content(
+                referred_by=player.player_id)
+            print(f"Draw: {new_card_content}")
+
+            has_succeeded = False
+            while True:
+                attack = get_attack(
+                    player=player,
+                    opponents=opponents,
+                    new_card=new_card_content,
+                    all_opened_cards=opened_cards,
+                    has_succeeded=has_succeeded
+                )
+                if attack is None:
+                    if not has_succeeded:
+                        raise Exception(
+                            "You can't skip your next attack because your attack has not succeeded yet.")
+                    print("Skip your next attack.")
+                    break
+
+                print(f"Attack: {attack}")
+                # Apply attack
+                history.append(attack)
+                opponent = players[attack.attacked_to]
+                result = opponent.hands.judge(attack=attack)
+                if result:
+                    print("Success!")
+                    has_succeeded = True
+                    opponent.hands.open(position=attack.position)
+                    opened_cards.append(CardContent(
+                        color=attack.card_content.color, number=attack.card_content.number))
+                    # Judge whether the game is over or not
+                    if opponent.hands.is_loser():
+                        losers += 1
+                        if losers == PLAYERS_NUM-1:
+                            print(
+                                f"The game is over! Winner: Player{player.player_id}.")
+                            return
+
+                else:
+                    print("Failed...")
+                    new_card.opened = True
+                    break
+
+            player.hands.add(new_card)
+
+            # switch attacker
+            attacker = (attacker+1) % PLAYERS_NUM
+
+
 if __name__ == '__main__':
-    deck = Deck(colors=COLORS, numbers=NUMBERS)
-
-    players = [init_player(deck=deck, player_id=player_id,
-                           max_hands=MAX_HANDS) for player_id in PLAYER_ID_LIST]
-    history = []
-    opened_cards = []
-    losers = 0
-    attacker = START_ATTACKER
-    MAX_TURNS = 10
-    for turn in range(MAX_TURNS):
-        for player in players:
-            print(player)
-            print(player.debug())
-        player = players[attacker]
-        print(f"Turn{turn+1} Attacker: Player{player.player_id}")
-        opponents = [
-            player for player in players if player.player_id != attacker]
-
-        new_card = deck.draw(player_id=player.player_id)
-        new_card_content = new_card.get_content(referred_by=player.player_id)
-        print(f"Draw: {new_card_content}")
-
-        has_succeeded = False
-        while True:
-            attack = get_attack(
-                player=player,
-                opponents=opponents,
-                new_card=new_card_content,
-                all_opened_cards=opened_cards,
-                has_succeeded=has_succeeded
-            )
-            if attack is None:
-                if not has_succeeded:
-                    raise Exception(
-                        "You can't skip your next attack because your attack has not succeeded yet.")
-                print("Skip your next attack.")
-                break
-
-            print(f"Attack: {attack}")
-            # Apply attack
-            history.append(attack)
-            opponent = players[attack.attacked_to]
-            result = opponent.hands.judge(attack=attack)
-            if result:
-                print("Success!")
-                has_succeeded = True
-                opponent.hands.open(position=attack.position)
-                opened_cards.append(CardContent(
-                    color=attack.card_content.color, number=attack.card_content.number))
-                # Judge whether the game is over or not
-                if opponent.hands.is_loser():
-                    losers += 1
-                    if losers == PLAYERS_NUM-1:
-                        print(
-                            f"The game is over! Winner: Player{player.player_id}.")
-                        break
-
-            else:
-                print("Failed...")
-                new_card.opened = True
-                break
-
-        player.hands.add(new_card)
-
-        # switch attacker
-        attacker = (attacker+1) % PLAYERS_NUM
+    game = Game(
+        colors=COLORS, numbers=NUMBERS, max_turns=MAX_TURNS, start_attacker=START_ATTACKER
+    )
+    game.start()
