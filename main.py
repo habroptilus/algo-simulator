@@ -7,7 +7,7 @@ NUMBERS = list(range(MAX_NUMBER+1))
 MAX_HANDS = 4
 PLAYERS_NUM = 2
 PLAYER_ID_LIST = list(range(PLAYERS_NUM))
-MAX_TURNS = 3
+
 START_ATTACKER = 0
 
 
@@ -41,7 +41,7 @@ class Card:
         self.opened = opened
         self.owned_by = owned_by
 
-    def get_content(self, referred_by: int) -> CardContent:
+    def get_content(self, referred_by: Optional[int] = None) -> CardContent:
         color = self.get_color()
         number = self.get_number(referred_by=referred_by)
         return CardContent(color=color, number=number)
@@ -49,15 +49,15 @@ class Card:
     def get_color(self) -> str:
         return self.__content.color
 
-    def get_number(self, referred_by: int):
-        if (referred_by != self.owned_by) and (not self.opened):
+    def get_number(self, referred_by: Optional[int] = None):
+        if (not self.opened) and (referred_by != self.owned_by):
             raise Exception(
                 f'The number is not available because the card is not opened and owned by Player{self.owned_by}, not Player{referred_by}.')
         return self.__content.number
 
     def open(self):
         if self.opened:
-            raise Exception(f'The card is already opend: {self}')
+            raise Exception(f'The card is already opened: {self}')
         self.opened = True
 
     def __eq__(self, __o: object) -> bool:
@@ -125,7 +125,7 @@ class Hands(CardList):
         target_card = self.cards[attack.position]
         if target_card.opened:
             raise Exception(
-                f'The attacked card is already opend: {target_card}.')
+                f'The attacked card is already opened: {target_card}.')
         return target_card.get_content(referred_by=attack.attacked_to) == attack.card_content
 
     def open(self, position: int):
@@ -133,8 +133,11 @@ class Hands(CardList):
         # original item is overwritten.
         target_card.open()
 
-    def get_closed_cards(self):
+    def get_closed_cards(self) -> List[Tuple[int, str]]:
         return [(i, card.get_color()) for i, card in enumerate(self.cards) if not card.opened]
+
+    def get_opened_cards(self) -> List[Tuple[int, CardContent]]:
+        return [(i, card.get_content()) for i, card in enumerate(self.cards) if card.opened]
 
     def get_contents(self, referred_by: int) -> List[CardContent]:
         return [card.get_content(referred_by=referred_by) for card in self.cards]
@@ -161,25 +164,58 @@ def init_player(deck: Deck, player_id: int, max_hands: int) -> Player:
     return Player(player_id=player_id, hands=hands)
 
 
-def get_attack(player: Player, opponents: List[Player], new_card: CardContent, opened_cards: List[CardContent], has_succeeded: bool) -> Optional[Attack]:
+def get_attack(player: Player, opponents: List[Player], new_card: CardContent, all_opened_cards: List[CardContent], has_succeeded: bool) -> Optional[Attack]:
     if has_succeeded:
         # In this logic, if your previous attack was successful, you skip the next attack.
         return
 
-    # TODO: Refactor here
-    # TODO: Consider the order of hands
-    candidates: List[Tuple[int, int, CardContent]] = []
+    # TODO: Consider the order of the hands
+    attack_candidates: List[Attack] = []
     for opponent in opponents:
         closed_cards = opponent.hands.get_closed_cards()
+        opened_cards = opponent.hands.get_opened_cards()
         owned_by_self = player.hands.get_contents(referred_by=player.player_id)
-        impossible_cards = opened_cards + owned_by_self + [new_card]
+        impossible_cards = all_opened_cards + owned_by_self + [new_card]
         for position, color in closed_cards:
-            candidates += [
-                (opponent.player_id, position, candidate) for candidate in [CardContent(color=color, number=number)
-                                                                            for number in NUMBERS] if candidate not in impossible_cards]
-    opponent_id, position, card_content = random.choice(candidates)
-    return Attack(position=position, color=card_content.color, number=card_content.number,
-                  attacked_to=opponent_id, attacked_by=player.player_id)
+            candidates = [CardContent(color=color, number=number)
+                          for number in NUMBERS]
+            lower_bound, upper_bound = get_bounds(
+                opened_cards=opened_cards, target=position)
+
+            if lower_bound is not None:
+                candidates = [
+                    candidate for candidate in candidates if lower_bound < candidate]
+
+            if upper_bound is not None:
+                candidates = [
+                    candidate for candidate in candidates if candidate < upper_bound]
+
+            attack_candidates += [
+                Attack(
+                    position=position,
+                    color=candidate.color,
+                    number=candidate.number,
+                    attacked_to=opponent.player_id,
+                    attacked_by=player.player_id)
+                for candidate in candidates
+                if (candidate not in impossible_cards)]
+    return random.choice(attack_candidates)
+
+
+def get_bounds(opened_cards: List[Tuple[int, CardContent]], target: int) -> Tuple[CardContent]:
+    # copy
+    opened_cards = list(opened_cards)
+    opened_cards.append((target, None))
+    sorted_list = sorted(opened_cards, key=lambda x: x[0])
+
+    index_target = sorted_list.index((target, None))
+
+    lower_bound = sorted_list[index_target -
+                              1][1] if index_target > 0 else None
+    upper_bound = sorted_list[index_target +
+                              1][1] if index_target < len(sorted_list) - 1 else None
+
+    return lower_bound, upper_bound
 
 
 if __name__ == '__main__':
@@ -191,7 +227,7 @@ if __name__ == '__main__':
     opened_cards = []
     losers = 0
     attacker = START_ATTACKER
-
+    MAX_TURNS = 10
     for turn in range(MAX_TURNS):
         for player in players:
             print(player)
@@ -207,8 +243,13 @@ if __name__ == '__main__':
 
         has_succeeded = False
         while True:
-            attack = get_attack(player=player, opponents=opponents,
-                                new_card=new_card_content, opened_cards=opened_cards, has_succeeded=has_succeeded)
+            attack = get_attack(
+                player=player,
+                opponents=opponents,
+                new_card=new_card_content,
+                all_opened_cards=opened_cards,
+                has_succeeded=has_succeeded
+            )
             if attack is None:
                 if not has_succeeded:
                     raise Exception(
