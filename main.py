@@ -235,7 +235,7 @@ def get_most_likely_attack_candidates(attack_candidates: List[Attack]) -> List[A
         elif candidates_num < min_attacks:
             most_likely_candidates = attacks
 
-    print(f"Extracted candidates with probability=1/{candidates_num}.")
+    # print(f"Extracted candidates with probability=1/{candidates_num}.")
     return most_likely_candidates
 
 
@@ -318,6 +318,13 @@ def get_attack(player: Player,
     return random.choice(most_likely_candidates)
 
 
+def print_status(players: List[Player]) -> None:
+    print("===Current Status===")
+    for player in players:
+        print(player)
+    print("====================")
+
+
 class Game:
     def __init__(self, colors, numbers, max_turns, start_attacker):
         self.colors = colors
@@ -335,8 +342,7 @@ class Game:
         losers = 0
         attacker = self.start_attacker
         for turn in range(self.max_turns):
-            for player in players:
-                print(player)
+            print_status(players)
             player = players[attacker]
             print(f"Turn{turn+1} Attacker: Player{player.player_id}")
             opponents = [
@@ -348,7 +354,6 @@ class Game:
             else:
                 new_card_content = new_card.get_content(
                     referred_by=player.player_id)
-                print(f"Draw: {new_card_content}")
 
             has_succeeded = False
             while True:
@@ -374,6 +379,7 @@ class Game:
                 result = opponent.hands.judge(attack=attack)
                 if result:
                     print("Success!")
+                    print_status(players=players)
                     has_succeeded = True
                     opponent.hands = opponent.hands.open(
                         position=attack.position)
@@ -398,6 +404,7 @@ class Game:
 
             # switch attacker
             attacker = (attacker+1) % PLAYERS_NUM
+            print("\n")
 
 
 if __name__ == '__main__':
