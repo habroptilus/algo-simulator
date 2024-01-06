@@ -68,7 +68,7 @@ class Card:
         self.opened = True
 
     def __eq__(self, __o: object) -> bool:
-        return __o.__content == self.__content
+        return (__o.__content == self.__content) and (__o.opened == self.opened) and (__o.owned_by == self.owned_by) and (__o.card_id == self.card_id)
 
     def __lt__(self, __o: object) -> bool:
         return self.__content < __o.__content
@@ -104,6 +104,14 @@ class CardList:
     def __len__(self) -> str:
         return len(self.cards)
 
+    def __eq__(self, __o: object) -> bool:
+        if len(self) != len(__o):
+            return False
+        for a, b in zip(self.cards, __o.cards):
+            if a != b:
+                return False
+        return True
+
     def debug(self) -> str:
         return " ".join([card.debug() for card in self.cards])
 
@@ -128,11 +136,21 @@ class Deck(CardList):
 
 class Hands(CardList):
     def __init__(self, cards: List[Card]):
-        self.cards: List[Card] = sorted(cards)
+        self.cards: List[Card] = cards
+        self.sort_cards()
 
-    def add(self, card: Card):
+    def append(self, card: Card):
         self.cards.append(card)
-        self.cards = sorted(self.cards)
+
+    def return_sorted_cards(self) -> List[Card]:
+        return sorted(self.cards)
+
+    def sort_cards(self):
+        self.cards = self.return_sorted_cards()
+
+    def insert(self, card: Card):
+        self.append(card)
+        self.cards = self.return_sorted_cards()
 
     def judge(self, attack: Attack) -> bool:
         target_card = self.cards[attack.position]
@@ -140,6 +158,10 @@ class Hands(CardList):
             raise Exception(
                 f'The attacked card is already opened: {target_card}.')
         return target_card.get_content(referred_by=attack.attacked_to) == attack.card_content
+
+    def is_valid(self) -> bool:
+        sorted_cards = self.return_sorted_cards()
+        return sorted_cards == self.cards
 
     def open(self, position: int):
         target_card = self.cards[position]
@@ -354,7 +376,7 @@ class Game:
                     break
 
             if new_card is not None:
-                player.hands.add(new_card)
+                player.hands.insert(new_card)
 
             # switch attacker
             attacker = (attacker+1) % PLAYERS_NUM
