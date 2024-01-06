@@ -117,7 +117,6 @@ class Deck(CardList):
         self.card_id = 0
 
     def draw(self, player_id: int) -> Optional[Card]:
-        # TODO: If the deck is empty, continue without new_card.
         if len(self.cards) == 0:
             return
         card = self.cards.pop()
