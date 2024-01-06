@@ -325,10 +325,21 @@ def print_status(players: List[Player]) -> None:
     print("====================")
 
 
-def get_attack_from_input(player: Player, opponents: List[Player]):
+def get_attack_from_input(player: Player, opponents: List[Player], new_card: Optional[CardContent], has_succeeded: bool):
+    if new_card is not None:
+        print(f"Draw: {new_card}")
     while True:
-        inputs = input("Enter [position] [card] > ").split()
+        inputs = input(
+            "Enter [position] [card]. To skip, return blank. > ").split()
+        if len(inputs) == 0:
+            if has_succeeded:
+                return
+            print(
+                "You can't skip your next attack because your attack has not succeeded yet.")
+            continue
         if len(inputs) <= 1 or len(inputs) >= 4:
+            print(
+                "Invalid inputs. The format should be '[position] [card]' or blank.")
             continue
         try:
             position = int(inputs[0])
@@ -399,7 +410,7 @@ class Game:
             while True:
                 if player.player_id == 0:
                     attack = get_attack_from_input(
-                        player=player, opponents=opponents)
+                        player=player, opponents=opponents, new_card=new_card_content, has_succeeded=has_succeeded)
                 else:
                     attack = get_attack(
                         player=player,
