@@ -177,7 +177,7 @@ def init_player(deck: Deck, player_id: int, max_hands: int) -> Player:
     return Player(player_id=player_id, hands=hands)
 
 
-def get_bounds(opened_cards: List[Tuple[int, CardContent]], target: int) -> Tuple[CardContent]:
+def get_bounds(opened_cards: List[Tuple[int, CardContent]], target: int) -> Tuple[CardContent, CardContent]:
     # TODO: Update its logic to get more strict bounds.
     # e.g. In the case of "W04 B?? W?? W?? W09", candidates of B?? are "B05,B06,B07",
     # not "B05,B06,B07,B08,B09" which would be calculated by the current logic.
@@ -230,15 +230,15 @@ def get_attack(player: Player,
         # Currently, you can control by 'skip_second_attack' option.
         return
     attack_candidates: List[Attack] = []
-
+    # Consider cards owned by yourself.
+    owned_by_self = player.hands.get_contents(referred_by=player.player_id)
+    impossible_cards_for_all_positions = all_opened_cards + owned_by_self
+    if new_card is not None:
+        impossible_cards_for_all_positions.append(new_card)
     for opponent in opponents:
         closed_cards = opponent.hands.get_closed_cards()
         opened_cards = opponent.hands.get_opened_cards()
-        # Consider cards owned by yourself.
-        owned_by_self = player.hands.get_contents(referred_by=player.player_id)
-        impossible_cards_for_all_positions = all_opened_cards + owned_by_self
-        if new_card is not None:
-            impossible_cards_for_all_positions.append(new_card)
+
         for position, card_id, color in closed_cards:
             candidates = [CardContent(color=color, number=number)
                           for number in NUMBERS]
