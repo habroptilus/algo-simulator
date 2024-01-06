@@ -327,7 +327,7 @@ def print_status(players: List[Player]) -> None:
 
 def get_attack_from_input(player: Player, opponents: List[Player]):
     while True:
-        inputs = input().split()
+        inputs = input("<position> <card>: ").split()
         if len(inputs) <= 1 or len(inputs) >= 4:
             continue
         try:
@@ -343,14 +343,20 @@ def get_attack_from_input(player: Player, opponents: List[Player]):
             target_player_id = int(inputs[2])
         if len(card_content) <= 1:
             continue
-        break
-    # parse card_content
-    color = card_content[0].upper()
-    number = int(card_content[1:])
 
-    opponent = opponents[target_player_id]
+        # parse card_content
+        color = card_content[0].upper()
+        number = int(card_content[1:])
+
+        opponent = opponents[target_player_id]
+        card = opponent.hands.cards[position]
+        if card.opened:
+            print("Specified card has already been opened!")
+            continue
+        break
+
     card_id = opponent.hands.cards[position].card_id
-    Attack(
+    return Attack(
         position=position,
         color=color,
         number=number,
@@ -391,14 +397,18 @@ class Game:
 
             has_succeeded = False
             while True:
-                attack = get_attack(
-                    player=player,
-                    opponents=opponents,
-                    new_card=new_card_content,
-                    opened_cards=opened_cards,
-                    has_succeeded=has_succeeded,
-                    history=history,
-                )
+                if player.player_id == 0:
+                    attack = get_attack_from_input(
+                        player=player, opponents=opponents)
+                else:
+                    attack = get_attack(
+                        player=player,
+                        opponents=opponents,
+                        new_card=new_card_content,
+                        opened_cards=opened_cards,
+                        has_succeeded=has_succeeded,
+                        history=history,
+                    )
                 if attack is None:
                     if not has_succeeded:
                         raise Exception(
@@ -413,12 +423,12 @@ class Game:
                 result = opponent.hands.judge(attack=attack)
                 if result:
                     print("Success!")
-                    print_status(players=players)
                     has_succeeded = True
                     opponent.hands = opponent.hands.open(
                         position=attack.position)
                     opened_cards.append(CardContent(
                         color=attack.card_content.color, number=attack.card_content.number))
+                    print_status(players=players)
                     # Judge whether the game is over or not
                     if opponent.hands.is_loser():
                         losers += 1
