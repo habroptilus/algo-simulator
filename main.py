@@ -40,7 +40,7 @@ class Card:
     def __init__(self,
                  color: str,
                  number: int,
-                 opened: bool = False,
+                 opened: bool = True,
                  owned_by: Optional[int] = None,
                  card_id: Optional[int] = None):
         self.__content = CardContent(color=color, number=number)
@@ -62,10 +62,10 @@ class Card:
                 f'The number is not available because the card is not opened and owned by Player{self.owned_by}, not Player{referred_by}.')
         return self.__content.number
 
-    def open(self):
+    def open(self) -> 'Card':
         if self.opened:
             raise Exception(f'The card is already opened: {self}')
-        self.opened = True
+        return Card(color=self.__content.color, number=self.__content.number, opened=True, owned_by=self.owned_by, card_id=self.card_id)
 
     def __eq__(self, __o: object) -> bool:
         return (__o.__content == self.__content) and (__o.opened == self.opened) and (__o.owned_by == self.owned_by) and (__o.card_id == self.card_id)
@@ -115,10 +115,17 @@ class CardList:
     def debug(self) -> str:
         return " ".join([card.debug() for card in self.cards])
 
+    def is_valid(self) -> bool:
+        sorted_cards = self.return_sorted_cards()
+        return sorted_cards == self.cards
+
+    def return_sorted_cards(self) -> List[Card]:
+        return sorted(self.cards)
+
 
 class Deck(CardList):
     def __init__(self, colors: List[str], numbers: List[int]):
-        cards = [Card(color=color, number=number)
+        cards = [Card(color=color, number=number, opened=False)
                  for color in colors for number in numbers]
         # shuffle
         self.cards: List[Card] = random.sample(cards, len(cards))
@@ -137,20 +144,10 @@ class Deck(CardList):
 class Hands(CardList):
     def __init__(self, cards: List[Card]):
         self.cards: List[Card] = cards
-        self.sort_cards()
-
-    def append(self, card: Card):
-        self.cards.append(card)
-
-    def return_sorted_cards(self) -> List[Card]:
-        return sorted(self.cards)
-
-    def sort_cards(self):
         self.cards = self.return_sorted_cards()
 
-    def insert(self, card: Card):
-        self.append(card)
-        self.cards = self.return_sorted_cards()
+    def insert(self, card: Card) -> 'Hands':
+        return Hands(self.cards + [card])
 
     def judge(self, attack: Attack) -> bool:
         target_card = self.cards[attack.position]
@@ -159,14 +156,13 @@ class Hands(CardList):
                 f'The attacked card is already opened: {target_card}.')
         return target_card.get_content(referred_by=attack.attacked_to) == attack.card_content
 
-    def is_valid(self) -> bool:
-        sorted_cards = self.return_sorted_cards()
-        return sorted_cards == self.cards
-
-    def open(self, position: int):
-        target_card = self.cards[position]
-        # original item is overwritten.
-        target_card.open()
+    def open(self, position: int) -> 'Hands':
+        # copy
+        cards = list(self.cards)
+        target_card = cards[position]
+        target_card = target_card.open()
+        cards[position] = target_card
+        return Hands(cards=cards)
 
     def get_closed_cards(self) -> List[Tuple[int, int, str]]:
         return [(position, card.card_id, card.get_color()) for position, card in enumerate(self.cards) if not card.opened]
@@ -341,7 +337,7 @@ class Game:
                     new_card=new_card_content,
                     all_opened_cards=opened_cards,
                     has_succeeded=has_succeeded,
-                    history=history
+                    history=history,
                 )
                 if attack is None:
                     if not has_succeeded:
@@ -358,7 +354,8 @@ class Game:
                 if result:
                     print("Success!")
                     has_succeeded = True
-                    opponent.hands.open(position=attack.position)
+                    opponent.hands = opponent.hands.open(
+                        position=attack.position)
                     opened_cards.append(CardContent(
                         color=attack.card_content.color, number=attack.card_content.number))
                     # Judge whether the game is over or not
@@ -376,7 +373,7 @@ class Game:
                     break
 
             if new_card is not None:
-                player.hands.insert(new_card)
+                player.hands = player.hands.insert(new_card)
 
             # switch attacker
             attacker = (attacker+1) % PLAYERS_NUM
