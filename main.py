@@ -480,7 +480,7 @@ class Game:
                         losers += 1
                         if losers == PLAYERS_NUM-1:
                             print(
-                                f"The game is over! Winner: {player.name}.")
+                                f"The game is over! Winner: {player.name}")
                             return player.player_id
 
                 else:
