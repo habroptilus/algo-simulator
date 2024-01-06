@@ -1,6 +1,7 @@
 
 import unittest
-from main import Hands, Card, SimulationHands, CardContent
+from tools.card_list import Hands, SimulationHands
+from tools.card import Card,  CardContent
 
 
 class HandsTest(unittest.TestCase):
