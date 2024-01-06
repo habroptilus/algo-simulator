@@ -325,6 +325,40 @@ def print_status(players: List[Player]) -> None:
     print("====================")
 
 
+def get_attack_from_input(player: Player, opponents: List[Player]):
+    while True:
+        inputs = input().split()
+        if len(inputs) <= 1 or len(inputs) >= 4:
+            continue
+        try:
+            position = int(inputs[0])
+        except Exception:
+            continue
+        card_content = inputs[1]
+        target_player_id = 0
+        if len(inputs) == 2 and len(opponents) > 1:
+            print("Multi opponents requires target player id as third argument.")
+            continue
+        if len(inputs) == 3:
+            target_player_id = int(inputs[2])
+        if len(card_content) <= 1:
+            continue
+        break
+    # parse card_content
+    color = card_content[0].upper()
+    number = int(card_content[1:])
+
+    opponent = opponents[target_player_id]
+    card_id = opponent.hands.cards[position].card_id
+    Attack(
+        position=position,
+        color=color,
+        number=number,
+        attacked_to=opponent.player_id,
+        attacked_by=player.player_id,
+        card_id=card_id)
+
+
 class Game:
     def __init__(self, colors, numbers, max_turns, start_attacker):
         self.colors = colors
