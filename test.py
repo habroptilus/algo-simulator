@@ -1,6 +1,6 @@
 
 import unittest
-from main import Hands, Card
+from main import Hands, Card, SimulationHands, CardContent
 
 
 class HandsTest(unittest.TestCase):
@@ -20,12 +20,31 @@ class HandsTest(unittest.TestCase):
                                 for color, number in expected_contents])
         self.assertEqual(expected, hands)
 
-    def test_is_valid(self):
+
+class SimulationHandsTest(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    def test_init(self):
         card_contents = [('W', 4), ('W', 1), ('B', 1)]
-        hands = Hands(cards=[Card(color=color, number=number)
-                             for color, number in card_contents])
-        hands = hands.insert(Card(color='B', number=4))
-        self.assertTrue(hands.is_valid(), hands)
+        invalid_hands = SimulationHands(cards=[Card(color=color, number=number)
+                                               for color, number in card_contents])
+        self.assertFalse(invalid_hands.is_valid(), invalid_hands)
+
+    def test_overwrite(self):
+        card_contents = [('W', 4), ('W', 1), ('B', 1)]
+        hands = SimulationHands(cards=[Card(color=color, number=number)
+                                       for color, number in card_contents])
+        old = CardContent('W', 1)
+        expected = CardContent('B', 10)
+        position = 1
+        hands_new = hands.overwrite(position, expected)
+
+        self.assertEqual(expected, hands_new.cards[position].get_content())
+        self.assertEqual(old, hands.cards[position].get_content())
 
 
 if __name__ == "__main__":

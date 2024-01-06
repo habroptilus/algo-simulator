@@ -115,12 +115,18 @@ class CardList:
     def debug(self) -> str:
         return " ".join([card.debug() for card in self.cards])
 
+
+class SimulationHands(CardList):
     def is_valid(self) -> bool:
-        sorted_cards = self.return_sorted_cards()
+        sorted_cards = sorted(self.cards)
         return sorted_cards == self.cards
 
-    def return_sorted_cards(self) -> List[Card]:
-        return sorted(self.cards)
+    def overwrite(self, position: int, content: CardContent) -> 'SimulationHands':
+        cards = list(self.cards)
+        target_card = cards[position]
+        cards[position] = Card(
+            color=content.color, number=content.number, owned_by=target_card.owned_by, card_id=target_card.card_id)
+        return SimulationHands(cards=cards)
 
 
 class Deck(CardList):
@@ -143,8 +149,7 @@ class Deck(CardList):
 
 class Hands(CardList):
     def __init__(self, cards: List[Card]):
-        self.cards: List[Card] = cards
-        self.cards = self.return_sorted_cards()
+        self.cards: List[Card] = sorted(cards)
 
     def insert(self, card: Card) -> 'Hands':
         return Hands(self.cards + [card])
