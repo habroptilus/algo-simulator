@@ -327,7 +327,7 @@ def print_status(players: List[Player]) -> None:
 
 def get_attack_from_input(player: Player, opponents: List[Player]):
     while True:
-        inputs = input("<position> <card>: ").split()
+        inputs = input("Enter [position] [card] > ").split()
         if len(inputs) <= 1 or len(inputs) >= 4:
             continue
         try:
