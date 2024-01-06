@@ -1,4 +1,5 @@
 import random
+import time
 from typing import List, Optional, Tuple
 from collections import defaultdict
 COLORS = ['B', 'W']
@@ -328,9 +329,10 @@ def print_status(players: List[Player]) -> None:
 def get_attack_from_input(player: Player, opponents: List[Player], new_card: Optional[CardContent], has_succeeded: bool):
     if new_card is not None:
         print(f"Draw: {new_card}")
+    print(f"Your cards: {player.hands.debug()}")
     while True:
         inputs = input(
-            "Enter [position] [card]. To skip, return blank. > ").split()
+            "Enter '[position] [card]'. To skip, return blank. > ").split()
         if len(inputs) == 0:
             if has_succeeded:
                 return
@@ -412,6 +414,8 @@ class Game:
                     attack = get_attack_from_input(
                         player=player, opponents=opponents, new_card=new_card_content, has_succeeded=has_succeeded)
                 else:
+                    print("Thinking...")
+                    time.sleep(3)
                     attack = get_attack(
                         player=player,
                         opponents=opponents,
@@ -431,9 +435,11 @@ class Game:
                 # Apply attack
                 history.append(attack)
                 opponent = players[attack.attacked_to]
+                print("Judging...")
+                time.sleep(3)
                 result = opponent.hands.judge(attack=attack)
                 if result:
-                    print("Success!")
+                    print("Success!\n")
                     has_succeeded = True
                     opponent.hands = opponent.hands.open(
                         position=attack.position)
@@ -449,7 +455,7 @@ class Game:
                             return player.player_id
 
                 else:
-                    print("Failed...")
+                    print("Failed.")
                     if new_card is not None:
                         new_card.opened = True
                     break
