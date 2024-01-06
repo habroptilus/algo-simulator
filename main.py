@@ -1,5 +1,6 @@
 import random
 from typing import List, Optional, Tuple
+from collections import defaultdict
 COLORS = ['B', 'W']
 MIN_NUMBER = 0
 MAX_NUMBER = 11
@@ -7,7 +8,6 @@ NUMBERS = list(range(MIN_NUMBER, MAX_NUMBER+1))
 MAX_HANDS = 4
 PLAYERS_NUM = 2
 PLAYER_ID_LIST = list(range(PLAYERS_NUM))
-
 START_ATTACKER = 0
 MAX_TURNS = 100
 
@@ -37,10 +37,16 @@ class CardContent:
 
 
 class Card:
-    def __init__(self, color: str, number: int, opened: bool = False, owned_by: Optional[int] = None):
+    def __init__(self,
+                 color: str,
+                 number: int,
+                 opened: bool = False,
+                 owned_by: Optional[int] = None,
+                 card_id: Optional[int] = None):
         self.__content = CardContent(color=color, number=number)
         self.opened = opened
         self.owned_by = owned_by
+        self.card_id = card_id
 
     def get_content(self, referred_by: Optional[int] = None) -> CardContent:
         color = self.get_color()
@@ -77,7 +83,8 @@ class Card:
 
 
 class Attack:
-    def __init__(self, position: int, color: str, number: int, attacked_to: int, attacked_by: int):
+    def __init__(self, card_id: int, position: int, color: str, number: int, attacked_to: int, attacked_by: int):
+        self.card_id = card_id
         self.position = position
         self.card_content = CardContent(color=color, number=number)
         self.attacked_to = attacked_to
@@ -105,7 +112,9 @@ class Deck(CardList):
     def __init__(self, colors: List[str], numbers: List[int]):
         cards = [Card(color=color, number=number)
                  for color in colors for number in numbers]
+        # shuffle
         self.cards: List[Card] = random.sample(cards, len(cards))
+        self.card_id = 0
 
     def draw(self, player_id: int) -> Optional[Card]:
         # TODO: If the deck is empty, continue without new_card.
@@ -113,6 +122,8 @@ class Deck(CardList):
             return
         card = self.cards.pop()
         card.owned_by = player_id
+        card.card_id = self.card_id
+        self.card_id += 1
         return card
 
 
@@ -136,11 +147,11 @@ class Hands(CardList):
         # original item is overwritten.
         target_card.open()
 
-    def get_closed_cards(self) -> List[Tuple[int, str]]:
-        return [(i, card.get_color()) for i, card in enumerate(self.cards) if not card.opened]
+    def get_closed_cards(self) -> List[Tuple[int, int, str]]:
+        return [(position, card.card_id, card.get_color()) for position, card in enumerate(self.cards) if not card.opened]
 
     def get_opened_cards(self) -> List[Tuple[int, CardContent]]:
-        return [(i, card.get_content()) for i, card in enumerate(self.cards) if card.opened]
+        return [(position, card.get_content()) for position, card in enumerate(self.cards) if card.opened]
 
     def get_contents(self, referred_by: int) -> List[CardContent]:
         return [card.get_content(referred_by=referred_by) for card in self.cards]
@@ -167,23 +178,81 @@ def init_player(deck: Deck, player_id: int, max_hands: int) -> Player:
     return Player(player_id=player_id, hands=hands)
 
 
-def get_attack(player: Player, opponents: List[Player], new_card: Optional[CardContent],
-               all_opened_cards: List[CardContent], has_succeeded: bool, skip_second_attack: bool = False) -> Optional[Attack]:
-    # TODO: Consider history.
+def get_bounds(opened_cards: List[Tuple[int, CardContent]], target: int) -> Tuple[CardContent]:
+    # TODO: Update its logic to get more strict bounds.
+    # e.g. In the case of "W04 B?? W?? W?? W09", candidates of B?? are "B05,B06,B07",
+    # not "B05,B06,B07,B08,B09" which would be calculated by the current logic.
+    # copy
+    opened_cards = list(opened_cards)
+    opened_cards.append((target, None))
+    sorted_list = sorted(opened_cards, key=lambda x: x[0])
+
+    index_target = sorted_list.index((target, None))
+
+    # TODO: Refactor by defining new type instead of tuple
+    lower_bound = sorted_list[index_target -
+                              1][1] if index_target > 0 else None
+    upper_bound = sorted_list[index_target +
+                              1][1] if index_target < len(sorted_list) - 1 else None
+
+    return lower_bound, upper_bound
+
+
+def get_most_likely_attack_candidates(attack_candidates: List[Attack]) -> List[Attack]:
+    counter = defaultdict(list)
+
+    for attack in attack_candidates:
+        counter[f"{attack.attacked_to}_{attack.position}"].append(attack)
+
+    min_attacks = 1000000
+    most_likely_candidates = []
+    for _, attacks in counter.items():
+        candidates_num = len(attacks)
+        if candidates_num == min_attacks:
+            most_likely_candidates += attacks
+        elif candidates_num < min_attacks:
+            most_likely_candidates = attacks
+
+    print(f"Extracted candidates with probability=1/{candidates_num}.")
+    return most_likely_candidates
+
+
+def get_attack(player: Player,
+               opponents: List[Player],
+               new_card: Optional[CardContent],
+               all_opened_cards: List[CardContent],
+               has_succeeded: bool,
+               history: List[Attack],
+               skip_second_attack: bool = False
+               ) -> Optional[Attack]:
+
     if has_succeeded and skip_second_attack:
-        # In this logic, if your previous attack was successful, you skip the next attack.
+        # TODO: Add strategy for the case the previous attack is successful.
+        # Currently, you can control by 'skip_second_attack' option.
         return
     attack_candidates: List[Attack] = []
+
     for opponent in opponents:
         closed_cards = opponent.hands.get_closed_cards()
         opened_cards = opponent.hands.get_opened_cards()
+        # Consider cards owned by yourself.
         owned_by_self = player.hands.get_contents(referred_by=player.player_id)
-        impossible_cards = all_opened_cards + owned_by_self
+        impossible_cards_for_all_positions = all_opened_cards + owned_by_self
         if new_card is not None:
-            impossible_cards.append(new_card)
-        for position, color in closed_cards:
+            impossible_cards_for_all_positions.append(new_card)
+        for position, card_id, color in closed_cards:
             candidates = [CardContent(color=color, number=number)
                           for number in NUMBERS]
+            # Consider history.
+            # Judge card's identity using card_id instead of position
+            # because position is variable due to insertion.
+            tried_attacks = [attack.card_content for attack in history
+                             if (attack.attacked_to == opponent.player_id)
+                             and (attack.card_id == card_id)]
+
+            impossible_cards = impossible_cards_for_all_positions + tried_attacks
+
+            # Consider bounds.
             lower_bound, upper_bound = get_bounds(
                 opened_cards=opened_cards, target=position)
 
@@ -201,27 +270,14 @@ def get_attack(player: Player, opponents: List[Player], new_card: Optional[CardC
                     color=candidate.color,
                     number=candidate.number,
                     attacked_to=opponent.player_id,
-                    attacked_by=player.player_id)
+                    attacked_by=player.player_id,
+                    card_id=card_id)
                 for candidate in candidates
                 if (candidate not in impossible_cards)]
-    return random.choice(attack_candidates)
-
-
-def get_bounds(opened_cards: List[Tuple[int, CardContent]], target: int) -> Tuple[CardContent]:
-    # copy
-    opened_cards = list(opened_cards)
-    opened_cards.append((target, None))
-    sorted_list = sorted(opened_cards, key=lambda x: x[0])
-
-    index_target = sorted_list.index((target, None))
-
-    # TODO: Refactor by defining new type instead of tuple
-    lower_bound = sorted_list[index_target -
-                              1][1] if index_target > 0 else None
-    upper_bound = sorted_list[index_target +
-                              1][1] if index_target < len(sorted_list) - 1 else None
-
-    return lower_bound, upper_bound
+    # Maximize success probability.
+    most_likely_candidates = get_most_likely_attack_candidates(
+        attack_candidates=attack_candidates)
+    return random.choice(most_likely_candidates)
 
 
 class Game:
@@ -263,7 +319,8 @@ class Game:
                     opponents=opponents,
                     new_card=new_card_content,
                     all_opened_cards=opened_cards,
-                    has_succeeded=has_succeeded
+                    has_succeeded=has_succeeded,
+                    history=history
                 )
                 if attack is None:
                     if not has_succeeded:
