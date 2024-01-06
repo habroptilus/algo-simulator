@@ -239,6 +239,39 @@ def get_most_likely_attack_candidates(attack_candidates: List[Attack]) -> List[A
     return most_likely_candidates
 
 
+def apply_filters(color: str, impossible_cards: List[CardContent],
+                  lower_bound: Optional[CardContent], upper_bound: Optional[CardContent]):
+    candidates = [CardContent(color=color, number=number)
+                  for number in NUMBERS]
+
+    if lower_bound is not None:
+        candidates = [
+            candidate for candidate in candidates if lower_bound < candidate]
+
+    if upper_bound is not None:
+        candidates = [
+            candidate for candidate in candidates if candidate < upper_bound]
+
+    return [candidate for candidate in candidates if (candidate not in impossible_cards)]
+
+
+def generate_tried_cards(card_id, history):
+    # Consider history.
+    # Judge card's identity using card_id instead of position
+    # because position is variable due to insertion.
+    return [attack.card_content for attack in history
+            if attack.card_id == card_id]
+
+
+def generate_impossible_cards(player, opened_cards, new_card):
+    # Consider cards owned by yourself.
+    owned_by_self = player.hands.get_contents(referred_by=player.player_id)
+    impossible_cards = opened_cards + owned_by_self
+    if new_card is not None:
+        impossible_cards.append(new_card)
+    return impossible_cards
+
+
 def get_attack(player: Player,
                opponents: List[Player],
                new_card: Optional[CardContent],
@@ -253,39 +286,23 @@ def get_attack(player: Player,
         # Currently, you can control by 'skip_second_attack' option.
         return
     attack_candidates: List[Attack] = []
-    # Consider cards owned by yourself.
-    owned_by_self = player.hands.get_contents(referred_by=player.player_id)
-    impossible_cards_for_all_positions = all_opened_cards + owned_by_self
-    if new_card is not None:
-        impossible_cards_for_all_positions.append(new_card)
+
+    impossible_cards = generate_impossible_cards(
+        player=player, opened_cards=all_opened_cards, new_card=new_card)
+
     for opponent in opponents:
         closed_cards = opponent.hands.get_closed_cards()
         opened_cards = opponent.hands.get_opened_cards()
 
         for position, card_id, color in closed_cards:
-            candidates = [CardContent(color=color, number=number)
-                          for number in NUMBERS]
-            # Consider history.
-            # Judge card's identity using card_id instead of position
-            # because position is variable due to insertion.
-            tried_attacks = [attack.card_content for attack in history
-                             if (attack.attacked_to == opponent.player_id)
-                             and (attack.card_id == card_id)]
-
-            impossible_cards = impossible_cards_for_all_positions + tried_attacks
-
+            tried_cards = generate_tried_cards(
+                card_id=card_id, history=history)
+            impossible_cards_locally = impossible_cards + tried_cards
             # Consider bounds.
             lower_bound, upper_bound = get_bounds(
                 opened_cards=opened_cards, target=position)
-
-            if lower_bound is not None:
-                candidates = [
-                    candidate for candidate in candidates if lower_bound < candidate]
-
-            if upper_bound is not None:
-                candidates = [
-                    candidate for candidate in candidates if candidate < upper_bound]
-
+            candidates = apply_filters(color=color, impossible_cards=impossible_cards_locally,
+                                       lower_bound=lower_bound, upper_bound=upper_bound)
             attack_candidates += [
                 Attack(
                     position=position,
@@ -294,8 +311,7 @@ def get_attack(player: Player,
                     attacked_to=opponent.player_id,
                     attacked_by=player.player_id,
                     card_id=card_id)
-                for candidate in candidates
-                if (candidate not in impossible_cards)]
+                for candidate in candidates]
     # Maximize success probability.
     most_likely_candidates = get_most_likely_attack_candidates(
         attack_candidates=attack_candidates)
