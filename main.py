@@ -255,7 +255,7 @@ def apply_filters(color: str, impossible_cards: List[CardContent],
     return [candidate for candidate in candidates if (candidate not in impossible_cards)]
 
 
-def generate_tried_cards(card_id, history):
+def generate_tried_cards(card_id: int, history: List[Attack]) -> List[CardContent]:
     # Consider history.
     # Judge card's identity using card_id instead of position
     # because position is variable due to insertion.
@@ -263,7 +263,7 @@ def generate_tried_cards(card_id, history):
             if attack.card_id == card_id]
 
 
-def generate_impossible_cards(player, opened_cards, new_card):
+def generate_impossible_cards(player: Player, opened_cards: List[CardContent], new_card: Optional[CardContent]) -> List[CardContent]:
     # Consider cards owned by yourself.
     owned_by_self = player.hands.get_contents(referred_by=player.player_id)
     impossible_cards = opened_cards + owned_by_self
@@ -275,7 +275,7 @@ def generate_impossible_cards(player, opened_cards, new_card):
 def get_attack(player: Player,
                opponents: List[Player],
                new_card: Optional[CardContent],
-               all_opened_cards: List[CardContent],
+               opened_cards: List[CardContent],
                has_succeeded: bool,
                history: List[Attack],
                skip_second_attack: bool = False
@@ -288,11 +288,11 @@ def get_attack(player: Player,
     attack_candidates: List[Attack] = []
 
     impossible_cards = generate_impossible_cards(
-        player=player, opened_cards=all_opened_cards, new_card=new_card)
+        player=player, opened_cards=opened_cards, new_card=new_card)
 
     for opponent in opponents:
         closed_cards = opponent.hands.get_closed_cards()
-        opened_cards = opponent.hands.get_opened_cards()
+        opened_cards_locally = opponent.hands.get_opened_cards()
 
         for position, card_id, color in closed_cards:
             tried_cards = generate_tried_cards(
@@ -300,7 +300,7 @@ def get_attack(player: Player,
             impossible_cards_locally = impossible_cards + tried_cards
             # Consider bounds.
             lower_bound, upper_bound = get_bounds(
-                opened_cards=opened_cards, target=position)
+                opened_cards=opened_cards_locally, target=position)
             candidates = apply_filters(color=color, impossible_cards=impossible_cards_locally,
                                        lower_bound=lower_bound, upper_bound=upper_bound)
             attack_candidates += [
@@ -356,7 +356,7 @@ class Game:
                     player=player,
                     opponents=opponents,
                     new_card=new_card_content,
-                    all_opened_cards=opened_cards,
+                    opened_cards=opened_cards,
                     has_succeeded=has_succeeded,
                     history=history,
                 )
