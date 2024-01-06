@@ -276,8 +276,8 @@ def get_attack(player: Player,
                opponents: List[Player],
                new_card: Optional[CardContent],
                opened_cards: List[CardContent],
-               has_succeeded: bool,
                history: List[Attack],
+               has_succeeded: bool,
                skip_second_attack: bool = False
                ) -> Optional[Attack]:
 
