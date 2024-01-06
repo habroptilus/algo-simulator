@@ -184,21 +184,16 @@ class Hands(CardList):
 
 
 class Player:
-    def __init__(self, player_id: int, hands: Hands):
+    def __init__(self, player_id: int, hands: Hands, name: Optional[str] = None):
         self.player_id = player_id
         self.hands = hands
+        self.name = name if name is not None else "Player{player_id}"
 
     def __repr__(self) -> str:
-        return f"Player{self.player_id}: {self.hands}"
+        return f"{self.name}: {self.hands}"
 
     def debug(self) -> str:
-        return f"Player{self.player_id}: {self.hands.debug()}"
-
-
-def init_player(deck: Deck, player_id: int, max_hands: int) -> Player:
-    hands = Hands(cards=[deck.draw(player_id=player_id)
-                  for _ in range(max_hands)])
-    return Player(player_id=player_id, hands=hands)
+        return f"{self.name}: {self.hands.debug()}"
 
 
 def get_bounds(opened_cards: List[Tuple[int, CardContent]], target: int) -> Tuple[CardContent, CardContent]:
@@ -320,10 +315,18 @@ def get_attack(player: Player,
 
 
 def print_status(players: List[Player]) -> None:
-    print("===Current Status===")
+
+    player_name_len = max([len(player.name) for player in players])
+    player_hands_len = max([len(player.hands) for player in players])
+    header = " "*(player_name_len+2) + \
+        " ".join([f"{str(i).rjust(3, ' ')}" for i in range(player_hands_len)])
+    title = "State"
+    upper_parts = "="*int((len(header)-len(title))/2)
+    print(upper_parts + title + upper_parts)
+    print(header)
     for player in players:
         print(player)
-    print("====================")
+    print("="*len(header))
 
 
 def get_attack_from_input(player: Player, opponents: List[Player], new_card: Optional[CardContent], has_succeeded: bool):
@@ -332,7 +335,7 @@ def get_attack_from_input(player: Player, opponents: List[Player], new_card: Opt
     print(f"Your cards: {player.hands.debug()}")
     while True:
         inputs = input(
-            "Enter '[position] [card]'. To skip, return blank. > ").split()
+            "Enter '[position] [card]' or blank. > ").split()
         if len(inputs) == 0:
             if has_succeeded:
                 return
@@ -379,17 +382,43 @@ def get_attack_from_input(player: Player, opponents: List[Player], new_card: Opt
 
 
 class Game:
-    def __init__(self, colors, numbers, max_turns, start_attacker):
+    def __init__(self, colors: List[str], numbers: List[int], max_turns: int,
+                 start_attacker: int,  max_hands: int, player_id_list=List[int],
+                 human_player: Optional[int] = None):
         self.colors = colors
         self.numbers = numbers
         self.max_turns = max_turns
         self.start_attacker = start_attacker
+        self.human_player: Optional[int] = human_player
+        self.max_hands = max_hands
+        self.player_id_list = player_id_list
+
+    def init_player(self, deck: Deck, player_id: int, name: str) -> Player:
+        hands = Hands(cards=[deck.draw(player_id=player_id)
+                             for _ in range(self.max_hands)])
+        return Player(player_id=player_id, hands=hands, name=name)
+
+    def init_players(self, deck: Deck, human_player: int) -> List[Player]:
+        players: List[Player] = []
+        cpu_num = 1
+        for player_id in self.player_id_list:
+            if player_id == human_player:
+                name = "You "
+            else:
+                name = f"CPU{cpu_num}"
+                cpu_num += 1
+            player = self.init_player(
+                deck=deck, player_id=player_id, name=name)
+            players.append(player)
+        return players
 
     def start(self):
+        human_player = self.human_player if self.human_player is not None else random.choice(
+            self.player_id_list)
+        print(f"You are Player{human_player}.")
         deck = Deck(colors=self.colors, numbers=self.numbers)
+        players = self.init_players(deck=deck, human_player=human_player)
 
-        players = [init_player(deck=deck, player_id=player_id,
-                               max_hands=MAX_HANDS) for player_id in PLAYER_ID_LIST]
         history = []
         opened_cards = []
         losers = 0
@@ -397,7 +426,7 @@ class Game:
         for turn in range(self.max_turns):
             print_status(players)
             player = players[attacker]
-            print(f"Turn{turn+1} Attacker: Player{player.player_id}")
+            print(f"Turn{turn+1} Attacker: {player.name}")
             opponents = [
                 player for player in players if player.player_id != attacker]
 
@@ -410,7 +439,7 @@ class Game:
 
             has_succeeded = False
             while True:
-                if player.player_id == 0:
+                if player.player_id == human_player:
                     attack = get_attack_from_input(
                         player=player, opponents=opponents, new_card=new_card_content, has_succeeded=has_succeeded)
                 else:
@@ -451,7 +480,7 @@ class Game:
                         losers += 1
                         if losers == PLAYERS_NUM-1:
                             print(
-                                f"The game is over! Winner: Player{player.player_id}.")
+                                f"The game is over! Winner: {player.name}.")
                             return player.player_id
 
                 else:
@@ -470,6 +499,7 @@ class Game:
 
 if __name__ == '__main__':
     game = Game(
-        colors=COLORS, numbers=NUMBERS, max_turns=MAX_TURNS, start_attacker=START_ATTACKER
+        colors=COLORS, numbers=NUMBERS, max_turns=MAX_TURNS, start_attacker=START_ATTACKER,
+        max_hands=MAX_HANDS, player_id_list=PLAYER_ID_LIST
     )
     game.start()
