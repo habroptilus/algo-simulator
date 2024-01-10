@@ -27,7 +27,17 @@ class CardList:
 
 
 class SimulationHands(CardList):
+    def __init__(self, cards: List[Card]):
+        # open all cards
+        return super().__init__([card.open() if not card.opened else card for card in cards])
+
     def is_valid(self) -> bool:
+        return self.is_sorted() and self.is_unique()
+
+    def is_unique(self) -> bool:
+        return len(set([str(card.get_content()) for card in self.cards])) == len(self.cards)
+
+    def is_sorted(self) -> bool:
         sorted_cards = sorted(self.cards)
         return sorted_cards == self.cards
 

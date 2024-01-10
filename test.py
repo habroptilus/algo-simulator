@@ -35,6 +35,21 @@ class SimulationHandsTest(unittest.TestCase):
                                                for color, number in card_contents])
         self.assertFalse(invalid_hands.is_valid(), invalid_hands)
 
+    def test_is_valid(self):
+        invalid_card_contents = [
+            [('W', 4), ('W', 1), ('B', 1)],
+            [('W', 4), ('W', 4), ('W', 5)],
+        ]
+        for card_contents in invalid_card_contents:
+            invalid_hands = SimulationHands(cards=[Card(color=color, number=number)
+                                                   for color, number in card_contents])
+            self.assertFalse(invalid_hands.is_valid(), invalid_hands)
+
+        valid_card_contents = [('W', 4), ('B', 5), ('W', 6)]
+        valid_hands = SimulationHands(cards=[Card(color=color, number=number)
+                                             for color, number in valid_card_contents])
+        self.assertTrue(valid_hands.is_valid(), valid_hands)
+
     def test_overwrite(self):
         card_contents = [('W', 4), ('W', 1), ('B', 1)]
         hands = SimulationHands(cards=[Card(color=color, number=number)
