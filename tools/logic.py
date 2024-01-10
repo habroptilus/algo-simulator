@@ -6,7 +6,7 @@ from tools.card_list import SimulationHands
 import random
 from collections import defaultdict
 from tools.consts import NUMBERS
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 
 
 def get_bounds(opened_cards: List[Tuple[int, CardContent]], target: int) -> Tuple[CardContent, CardContent]:
@@ -76,6 +76,17 @@ def generate_impossible_cards(player: Player, opened_cards: List[CardContent], n
     return impossible_cards
 
 
+def get_local_candidates(card_id, history, impossible_cards, opened_cards_locally, color, position) -> List[CardContent]:
+    tried_cards = generate_tried_cards(
+        card_id=card_id, history=history)
+    impossible_cards_locally = impossible_cards + tried_cards
+    # Consider bounds.
+    lower_bound, upper_bound = get_bounds(
+        opened_cards=opened_cards_locally, target=position)
+    return apply_filters(color=color, impossible_cards=impossible_cards_locally,
+                         lower_bound=lower_bound, upper_bound=upper_bound)
+
+
 def get_attack(player: Player,
                opponents: List[Player],
                new_card: Optional[CardContent],
@@ -89,44 +100,75 @@ def get_attack(player: Player,
         # TODO: Add strategy for the case the previous attack is successful.
         # Currently, you can control by 'skip_second_attack' option.
         return
-    attack_candidates: List[Attack] = []
 
     impossible_cards = generate_impossible_cards(
         player=player, opened_cards=opened_cards, new_card=new_card)
 
-    opponent_closed_positions = {}
-    dat = []
+    opponent_closed_positions: Dict[int, List[int]] = defaultdict(list)
+    local_candidates_list: List[List[CardContent]] = []
     for opponent in opponents:
         closed_cards = opponent.hands.get_closed_cards()
         opened_cards_locally = opponent.hands.get_opened_cards()
-        positions = []
         for position, card_id, color in closed_cards:
-            tried_cards = generate_tried_cards(
-                card_id=card_id, history=history)
-            impossible_cards_locally = impossible_cards + tried_cards
-            # Consider bounds.
-            lower_bound, upper_bound = get_bounds(
-                opened_cards=opened_cards_locally, target=position)
-            candidates = apply_filters(color=color, impossible_cards=impossible_cards_locally,
-                                       lower_bound=lower_bound, upper_bound=upper_bound)
+            local_candidates: List[CardContent] = get_local_candidates(
+                card_id=card_id, history=history, impossible_cards=impossible_cards, opened_cards_locally=opened_cards_locally, color=color)
 
-            positions.append(position)
+            opponent_closed_positions[opponent.player_id].append(position)
+            local_candidates_list.append(local_candidates)
 
-            dat.append(candidates)
+    candidate_hands_list: List[List[SimulationHands]] = enumerate_candidates(
+        local_candidates_list, opponent_closed_positions, opponents)
 
-            attack_candidates += [
-                Attack(
+    counter: Dict[Tuple[int, int], Dict[str, int]
+                  ] = defaultdict(lambda: defaultdict(int))
+    for sim_hands_list in candidate_hands_list:
+        for opponent_id, sim_hands in sim_hands_list:
+            for position, card in enumerate(sim_hands.cards):
+                counter[(opponent_id, position)][str(card.get_content())] += 1
+
+    attacks_with_proba = get_attacks_with_proba(
+        counter=counter, opponents=opponents, player=player)
+
+    for attack, proba in attacks_with_proba:
+        print(attack, proba)
+
+    print(len(attacks_with_proba))
+
+    # Maximize success probability.
+    most_likely_candidates = get_most_likely_attack_candidates(
+        attack_candidates=attacks_with_proba)
+    chosen_attack, proba = random.choice(most_likely_candidates)
+    print(f"Probability: {proba}")
+    return chosen_attack
+
+
+def get_attacks_with_proba(counter: Dict[Tuple[int, int], Dict[str, int]],
+                           opponents: List[Player], player: Player) -> List[Tuple[Attack, float]]:
+    attacks_with_proba: List[Tuple[Attack, float]] = []
+    for opponent in opponents:
+        closed_cards = opponent.hands.get_closed_cards()
+        for position, card_id, _ in closed_cards:
+            inner_counter = counter[(opponent.player_id, position)]
+            denominator = len(inner_counter)
+            for card_content, count in inner_counter.items():
+                attack = Attack(
+                    card_id=card_id,
                     position=position,
-                    color=candidate.color,
-                    number=candidate.number,
+                    color=card_content[0],
+                    number=int(card_content[1:]),
                     attacked_to=opponent.player_id,
-                    attacked_by=player.player_id,
-                    card_id=card_id)
-                for candidate in candidates]
-        opponent_closed_positions[opponent.player_id] = positions
+                    attacked_by=player.player_id
+                ),
+                proba = count / denominator
+                attacks_with_proba.append((attack, proba))
+    return attacks_with_proba
 
-    fuga = list(itertools.product(*dat))
-    results = []
+
+def enumerate_candidates(local_candidates_list: List[List[CardContent]],
+                         opponent_closed_positions: Dict[int, List[int]],
+                         opponents: List[Player]) -> List[List[SimulationHands]]:
+    fuga = list(itertools.product(*local_candidates_list))
+    results: List[List[SimulationHands]] = []
     for card_contents in fuga:
         sim_hands_list = []
         for i, (opponent_id, positions) in enumerate(opponent_closed_positions.items()):
@@ -144,40 +186,7 @@ def get_attack(player: Player,
         if all([sim_hands.is_valid() for _, sim_hands in sim_hands_list]):
             print(sim_hands_list)
             results.append(sim_hands_list)
-    denominator = len(results)
-    counter = defaultdict(lambda: defaultdict(int))
-    for sim_hands_list in results:
-        for opponent_id, sim_hands in sim_hands_list:
-            for position, card in enumerate(sim_hands.cards):
-                counter[(opponent_id, position)][str(card.get_content())] += 1
-
-    attacks_with_proba = []
-    for opponent in opponents:
-        closed_cards = opponent.hands.get_closed_cards()
-        opened_cards_locally = opponent.hands.get_opened_cards()
-        positions = []
-        for position, card_id, color in closed_cards:
-            for card_content, count in counter[(opponent.player_id, position)].items():
-                attacks_with_proba.append(
-                    (Attack(
-                        card_id=card_id,
-                        position=position,
-                        color=card_content[0],
-                        number=int(card_content[1:]),
-                        attacked_to=opponent_id,
-                        attacked_by=player.player_id
-                    ), count/denominator))
-
-    for attack, proba in attacks_with_proba:
-        print(attack, proba)
-    print(len(attacks_with_proba))
-    print(len(attack_candidates))
-    # Maximize success probability.
-    most_likely_candidates = get_most_likely_attack_candidates(
-        attack_candidates=attacks_with_proba)
-    chosen_attack, proba = random.choice(most_likely_candidates)
-    print(f"Probability: {proba}")
-    return chosen_attack
+    return results
 
 
 def get_attack_from_input(player: Player, opponents: List[Player], new_card: Optional[CardContent], has_succeeded: bool):
