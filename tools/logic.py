@@ -111,13 +111,16 @@ def get_attack(player: Player,
         opened_cards_locally = opponent.hands.get_opened_cards()
         for position, card_id, color in closed_cards:
             local_candidates: List[CardContent] = get_local_candidates(
-                card_id=card_id, history=history, impossible_cards=impossible_cards, opened_cards_locally=opened_cards_locally, color=color)
+                card_id=card_id, history=history, impossible_cards=impossible_cards,
+                opened_cards_locally=opened_cards_locally, color=color, position=position)
 
             opponent_closed_positions[opponent.player_id].append(position)
             local_candidates_list.append(local_candidates)
 
     candidate_hands_list: List[List[SimulationHands]] = enumerate_candidates(
         local_candidates_list, opponent_closed_positions, opponents)
+
+    print(f"Hand candidates: {len(candidate_hands_list)}")
 
     counter: Dict[Tuple[int, int], Dict[str, int]
                   ] = defaultdict(lambda: defaultdict(int))
@@ -129,16 +132,13 @@ def get_attack(player: Player,
     attacks_with_proba = get_attacks_with_proba(
         counter=counter, opponents=opponents, player=player)
 
-    for attack, proba in attacks_with_proba:
-        print(attack, proba)
-
-    print(len(attacks_with_proba))
+    print(f"Attack candidates: {len(attacks_with_proba)}")
 
     # Maximize success probability.
     most_likely_candidates = get_most_likely_attack_candidates(
         attack_candidates=attacks_with_proba)
     chosen_attack, proba = random.choice(most_likely_candidates)
-    print(f"Probability: {proba}")
+    print(f"Max probability: {proba}")
     return chosen_attack
 
 
@@ -149,7 +149,7 @@ def get_attacks_with_proba(counter: Dict[Tuple[int, int], Dict[str, int]],
         closed_cards = opponent.hands.get_closed_cards()
         for position, card_id, _ in closed_cards:
             inner_counter = counter[(opponent.player_id, position)]
-            denominator = len(inner_counter)
+            denominator = sum([freq for freq in inner_counter.values()])
             for card_content, count in inner_counter.items():
                 attack = Attack(
                     card_id=card_id,
@@ -158,7 +158,7 @@ def get_attacks_with_proba(counter: Dict[Tuple[int, int], Dict[str, int]],
                     number=int(card_content[1:]),
                     attacked_to=opponent.player_id,
                     attacked_by=player.player_id
-                ),
+                )
                 proba = count / denominator
                 attacks_with_proba.append((attack, proba))
     return attacks_with_proba
@@ -184,7 +184,6 @@ def enumerate_candidates(local_candidates_list: List[List[CardContent]],
                     position=position, content=content)
             sim_hands_list.append((opponent_id, sim_hands))
         if all([sim_hands.is_valid() for _, sim_hands in sim_hands_list]):
-            print(sim_hands_list)
             results.append(sim_hands_list)
     return results
 
