@@ -116,6 +116,9 @@ class Game:
                 self.player_id_list)
             print(f"You are Player{human_player}.")
         else:
+            if self.human_player is not None:
+                print(
+                    "Warning: include_human_player is False but human_player is specified.")
             human_player = None
             print("Any Human player doesn't join this game.")
         return human_player
