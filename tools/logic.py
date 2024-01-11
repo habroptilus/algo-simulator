@@ -29,18 +29,17 @@ def get_bounds(opened_cards: List[Tuple[int, CardContent]], target: int) -> Tupl
     return lower_bound, upper_bound
 
 
-def get_most_likely_attack_candidates(attack_candidates: List[Tuple[Attack, float]]) -> List[Tuple[Attack, float]]:
-    max_proba = 0
-    most_likely_candidates = []
+def get_attacks_with_target_proba(attack_candidates: List[Tuple[Attack, float]], target_proba: float) -> List[Tuple[Attack, float]]:
+    min_diff = 10
+    results = []
     for attack, proba in attack_candidates:
-        if max_proba < proba:
-            most_likely_candidates = [(attack, proba)]
-            max_proba = proba
-
-        if abs(proba - max_proba) <= 0.0001:
-            most_likely_candidates.append((attack, proba))
-
-    return most_likely_candidates
+        diff = abs(target_proba-proba)
+        if diff < min_diff:
+            results = [(attack, proba)]
+            min_distance = diff
+        if abs(diff - min_distance) <= 0.0001:
+            results.append((attack, proba))
+    return results
 
 
 def apply_filters(color: str, impossible_cards: List[CardContent],
@@ -89,21 +88,7 @@ def get_local_candidates(card_id: Optional[int], history: List[Attack], impossib
                          lower_bound=lower_bound, upper_bound=upper_bound)
 
 
-def get_attack(player: Player,
-               opponents: List[Player],
-               new_card: Optional[CardContent],
-               opened_cards: List[CardContent],
-               history: List[Attack],
-               has_succeeded: bool,
-               skip_second_attack: bool = False
-               ) -> Optional[Attack]:
-
-    if has_succeeded and skip_second_attack:
-        # TODO: Add strategy for the case the previous attack is successful.
-        # Currently, you can control by 'skip_second_attack' option.
-        return
-
-    # estimate local candidates if new card were inserted with being closed.
+def simulate_if_insert_directly(new_card, player, opened_cards, history):
     card = Card(color=new_card.color, number=new_card.number,
                 opened=False)
     inserted_hands, position = player.hands.insert(card=card)
@@ -112,8 +97,29 @@ def get_attack(player: Player,
     local_candidate = get_local_candidates(
         card_id=None, history=history, impossible_cards=impossible_cards,
         opened_cards_locally=opened_cards_locally, color=card.get_color(), position=position)
-    estimated_reward_for_skip = len(local_candidate)
+    return len(local_candidate)
+
+
+def get_attack(player: Player,
+               opponents: List[Player],
+               new_card: Optional[CardContent],
+               opened_cards: List[CardContent],
+               history: List[Attack],
+               has_succeeded: bool,
+               ) -> Optional[Attack]:
+
+    # estimate reward if new card were inserted with being closed.
+    estimated_reward_for_skip = simulate_if_insert_directly(
+        new_card=new_card, player=player, opened_cards=opened_cards, history=history)
     print(f"Estimated reward for skip: {estimated_reward_for_skip}")
+
+    if estimated_reward_for_skip > 1:
+        strategy = 'defense'
+    else:
+        strategy = 'attack'
+
+    if (strategy == 'defense') and has_succeeded:
+        return
 
     impossible_cards = generate_impossible_cards(
         player=player, opened_cards=opened_cards, new_card=new_card)
@@ -148,10 +154,17 @@ def get_attack(player: Player,
 
     print(f"Attack candidates: {len(attacks_with_proba)}")
 
-    # Maximize success probability.
-    most_likely_candidates = get_most_likely_attack_candidates(
-        attack_candidates=attacks_with_proba)
-    chosen_attack, proba = random.choice(most_likely_candidates)
+    if strategy == 'attack':
+        # Maxize entropy to decrease the number of candidates
+        attack_candidates = get_attacks_with_target_proba(
+            attack_candidates=attacks_with_proba, target_proba=0.5)
+    elif strategy == 'defense':
+        # Maximize success probability to skip the next attack.
+        attack_candidates = get_attacks_with_target_proba(
+            attack_candidates=attacks_with_proba, target_proba=1)
+    else:
+        raise Exception(f"Invalid strategy: {strategy}")
+    chosen_attack, proba = random.choice(attack_candidates)
     print(f"Max probability: {int(proba*100):.1f}%")
     return chosen_attack
 

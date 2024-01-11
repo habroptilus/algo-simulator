@@ -71,7 +71,7 @@ class Game:
                     if not has_succeeded:
                         raise Exception(
                             "You can't skip your next attack because your attack has not succeeded yet.")
-                    print("Skip your next attack.")
+                    print("Skip the next attack.")
                     break
 
                 print(f"Attack: {attack}")
