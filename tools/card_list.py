@@ -25,6 +25,9 @@ class CardList:
     def debug(self) -> str:
         return " ".join([card.debug() for card in self.cards])
 
+    def is_unique(self) -> bool:
+        return len(set([str(card.get_content_id()) for card in self.cards])) == len(self.cards)
+
 
 class SimulationHands(CardList):
     def __init__(self, cards: List[Card]):
@@ -33,9 +36,6 @@ class SimulationHands(CardList):
 
     def is_valid(self) -> bool:
         return self.is_sorted() and self.is_unique()
-
-    def is_unique(self) -> bool:
-        return len(set([str(card.get_content()) for card in self.cards])) == len(self.cards)
 
     def is_sorted(self) -> bool:
         sorted_cards = sorted(self.cards)
@@ -71,8 +71,21 @@ class Hands(CardList):
     def __init__(self, cards: List[Card]):
         self.cards: List[Card] = sorted(cards)
 
-    def insert(self, card: Card) -> 'Hands':
-        return Hands(self.cards + [card])
+    def insert(self, card: Card) -> Tuple['Hands', int]:
+        hands = Hands(cards=self.cards + [card])
+        if not hands.is_unique():
+            raise Exception(
+                f"Inserted card violates hands' uniqueness: {card}")
+        position = hands.find(card=card)
+        assert position is not None
+
+        return hands, position
+
+    def find(self, card: Card) -> Optional[int]:
+        if card not in self.cards:
+            return
+
+        return self.cards.index(card)
 
     def judge(self, attack: Attack) -> bool:
         target_card = self.cards[attack.position]

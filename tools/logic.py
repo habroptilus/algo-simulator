@@ -1,6 +1,6 @@
 import itertools
 from tools.player import Player
-from tools.card import CardContent
+from tools.card import CardContent, Card
 from tools.attack import Attack
 from tools.card_list import SimulationHands
 import random
@@ -59,7 +59,7 @@ def apply_filters(color: str, impossible_cards: List[CardContent],
     return [candidate for candidate in candidates if (candidate not in impossible_cards)]
 
 
-def generate_tried_cards(card_id: int, history: List[Attack]) -> List[CardContent]:
+def generate_tried_cards(card_id: Optional[int], history: List[Attack]) -> List[CardContent]:
     # Consider history.
     # Judge card's identity using card_id instead of position
     # because position is variable due to insertion.
@@ -67,16 +67,18 @@ def generate_tried_cards(card_id: int, history: List[Attack]) -> List[CardConten
             if attack.card_id == card_id]
 
 
-def generate_impossible_cards(player: Player, opened_cards: List[CardContent], new_card: Optional[CardContent]) -> List[CardContent]:
-    # Consider cards owned by yourself.
-    owned_by_self = player.hands.get_contents(referred_by=player.player_id)
-    impossible_cards = opened_cards + owned_by_self
+def generate_impossible_cards(opened_cards: List[CardContent], new_card: Optional[CardContent] = None, player: Optional[Player] = None) -> List[CardContent]:
+    impossible_cards = list(opened_cards)
+    if player is not None:
+        owned_by_self = player.hands.get_contents(referred_by=player.player_id)
+        impossible_cards += owned_by_self
     if new_card is not None:
         impossible_cards.append(new_card)
     return impossible_cards
 
 
-def get_local_candidates(card_id, history, impossible_cards, opened_cards_locally, color, position) -> List[CardContent]:
+def get_local_candidates(card_id: Optional[int], history: List[Attack], impossible_cards: List[CardContent],
+                         opened_cards_locally: List[CardContent], color: str, position: int) -> List[CardContent]:
     tried_cards = generate_tried_cards(
         card_id=card_id, history=history)
     impossible_cards_locally = impossible_cards + tried_cards
@@ -100,6 +102,18 @@ def get_attack(player: Player,
         # TODO: Add strategy for the case the previous attack is successful.
         # Currently, you can control by 'skip_second_attack' option.
         return
+
+    # estimate local candidates if new card were inserted with being closed.
+    card = Card(color=new_card.color, number=new_card.number,
+                opened=False)
+    inserted_hands, position = player.hands.insert(card=card)
+    impossible_cards = generate_impossible_cards(opened_cards=opened_cards)
+    opened_cards_locally = inserted_hands.get_opened_cards()
+    local_candidate = get_local_candidates(
+        card_id=None, history=history, impossible_cards=impossible_cards,
+        opened_cards_locally=opened_cards_locally, color=card.get_color(), position=position)
+    estimated_reward_for_skip = len(local_candidate)
+    print(f"Estimated reward for skip: {estimated_reward_for_skip}")
 
     impossible_cards = generate_impossible_cards(
         player=player, opened_cards=opened_cards, new_card=new_card)
@@ -138,7 +152,7 @@ def get_attack(player: Player,
     most_likely_candidates = get_most_likely_attack_candidates(
         attack_candidates=attacks_with_proba)
     chosen_attack, proba = random.choice(most_likely_candidates)
-    print(f"Max probability: {proba}")
+    print(f"Max probability: {int(proba*100):.1f}%")
     return chosen_attack
 
 

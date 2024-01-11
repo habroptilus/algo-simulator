@@ -1,5 +1,6 @@
 from typing import Optional
 from tools.card_list import Hands
+from tools.card import Card
 
 
 class Player:
@@ -13,3 +14,8 @@ class Player:
 
     def debug(self) -> str:
         return f"{self.name}: {self.hands.debug()}"
+
+    def insert(self, card: Card) -> 'Player':
+        card = card.belongs_to(self.player_id)
+        hands = self.hands.insert(card=card)
+        return Player(player_id=self.player_id, hands=hands, name=self.name)

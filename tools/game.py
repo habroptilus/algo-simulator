@@ -104,7 +104,8 @@ class Game:
                     break
 
             if new_card is not None:
-                player.hands = player.hands.insert(new_card)
+                player.hands, _ = player.hands.insert(new_card)
+                print(f"Inserted: {new_card}")
 
             # switch attacker
             attacker = (attacker+1) % PLAYERS_NUM
