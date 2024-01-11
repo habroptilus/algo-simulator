@@ -100,27 +100,7 @@ def simulate_if_insert_directly(new_card, player, opened_cards, history):
     return len(local_candidate)
 
 
-def get_attack(player: Player,
-               opponents: List[Player],
-               new_card: Optional[CardContent],
-               opened_cards: List[CardContent],
-               history: List[Attack],
-               has_succeeded: bool,
-               ) -> Optional[Attack]:
-
-    # estimate reward if new card were inserted with being closed.
-    estimated_reward_for_skip = simulate_if_insert_directly(
-        new_card=new_card, player=player, opened_cards=opened_cards, history=history)
-    print(f"Estimated reward for skip: {estimated_reward_for_skip}")
-
-    if estimated_reward_for_skip > 1:
-        strategy = 'defense'
-    else:
-        strategy = 'attack'
-
-    if (strategy == 'defense') and has_succeeded:
-        return
-
+def calculate_hand_candidates(player, opened_cards, new_card, opponents, history) -> List[List[SimulationHands]]:
     impossible_cards = generate_impossible_cards(
         player=player, opened_cards=opened_cards, new_card=new_card)
 
@@ -137,11 +117,43 @@ def get_attack(player: Player,
             opponent_closed_positions[opponent.player_id].append(position)
             local_candidates_list.append(local_candidates)
 
-    candidate_hands_list: List[List[SimulationHands]] = enumerate_candidates(
+    return enumerate_candidates(
         local_candidates_list, opponent_closed_positions, opponents)
+
+
+def get_attack(player: Player,
+               opponents: List[Player],
+               new_card: Optional[CardContent],
+               opened_cards: List[CardContent],
+               history: List[Attack],
+               has_succeeded: bool,
+               ) -> Optional[Attack]:
+
+    # estimate reward if new card were inserted with being closed.
+    estimated_reward_for_skip = simulate_if_insert_directly(
+        new_card=new_card, player=player, opened_cards=opened_cards, history=history)
+    print(f"Estimated reward for skip: {estimated_reward_for_skip}")
+
+    # enumerate hands candidates for opponents
+    candidate_hands_list: List[List[SimulationHands]] = calculate_hand_candidates(
+        player=player, opened_cards=opened_cards, new_card=new_card,
+        opponents=opponents, history=history)
 
     print(f"Hand candidates: {len(candidate_hands_list)}")
 
+    # Decide strategy by using values above.
+    if len(candidate_hands_list) <= 5:
+        # about to win
+        strategy = 'attack'
+    elif estimated_reward_for_skip > 5:
+        # big reward if skipped
+        if has_succeeded:
+            return
+        strategy = 'defense'
+    else:
+        strategy = 'attack'
+
+    # get attacks with probability
     counter: Dict[Tuple[int, int], Dict[str, int]
                   ] = defaultdict(lambda: defaultdict(int))
     for sim_hands_list in candidate_hands_list:
@@ -154,6 +166,7 @@ def get_attack(player: Player,
 
     print(f"Attack candidates: {len(attacks_with_proba)}")
 
+    # filter attacks based on strategy and their probabilities.
     if strategy == 'attack':
         # Maxize entropy to decrease the number of candidates
         attack_candidates = get_attacks_with_target_proba(
@@ -164,6 +177,8 @@ def get_attack(player: Player,
             attack_candidates=attacks_with_proba, target_proba=1)
     else:
         raise Exception(f"Invalid strategy: {strategy}")
+
+    # sample an attack.
     chosen_attack, proba = random.choice(attack_candidates)
     print(f"Max probability: {int(proba*100):.1f}%")
     return chosen_attack
