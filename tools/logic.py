@@ -7,6 +7,8 @@ import random
 from collections import defaultdict
 from tools.consts import NUMBERS
 from typing import List, Optional, Tuple, Dict
+import numpy as np
+import copy
 
 
 def get_bounds(opened_cards: List[Tuple[int, CardContent]], target: int) -> Tuple[CardContent, CardContent]:
@@ -139,21 +141,14 @@ def get_attack(player: Player,
         player=player, opened_cards=opened_cards, new_card=new_card,
         opponents=opponents, history=history)
 
+    attacks_with_proba = transform_candidates_from_hand_to_attack(
+        candidate_hands_list=candidate_hands_list, opponents=opponents, player=player)
     print(f"Hand candidates: {len(candidate_hands_list)}")
 
-    # get attacks with probability
-    counter: Dict[Tuple[int, int], Dict[str, int]
-                  ] = defaultdict(lambda: defaultdict(int))
-    for sim_hands_list in candidate_hands_list:
-        for opponent_id, sim_hands in sim_hands_list:
-            for position, card in enumerate(sim_hands.cards):
-                counter[(opponent_id, position)][str(card.get_content())] += 1
-
-    attacks_with_proba = get_attacks_with_proba(
-        counter=counter, opponents=opponents, player=player)
-
     print(f"Attack candidates (Overall): {len(attacks_with_proba)}")
-
+    max_eval, max_attack = hoge(attacks_with_proba=attacks_with_proba,
+                                candidate_hands_list=candidate_hands_list, opponents=opponents, player=player)
+    print(f"Evaluation:{max_eval}, Attack: {max_attack}")
     # choose attacks to maxmize success probability
     attack_candidates = get_attacks_with_target_proba(
         attack_candidates=attacks_with_proba, target_proba=1)
@@ -164,6 +159,51 @@ def get_attack(player: Player,
     chosen_attack, proba = random.choice(attack_candidates)
     print(f"Probability of Success: {int(proba*100):.1f}%")
     return chosen_attack, proba
+
+
+def hoge(attacks_with_proba, candidate_hands_list, opponents, player):
+    if len(attacks_with_proba) == 0:
+        return 0, None
+    max_eval = 0
+    max_attack = None
+    for attack, p in attacks_with_proba:
+        filtered = [
+            candidate_hands for candidate_hands in candidate_hands_list for opponent, hands in candidate_hands
+            if (opponent == attack.attacked_to) and (hands.cards[attack.position].get_content() == attack.card_content)]
+
+        # copy
+        opponents_sim = copy.deepcopy(opponents)
+        for opponent_sim in opponents_sim:
+            if opponent_sim.player_id == attack.attacked_to:
+                opponent_sim.open(position=attack.position)
+
+        next_attacks = transform_candidates_from_hand_to_attack(
+            candidate_hands_list=filtered, opponents=opponents_sim, player=player)
+
+        descendant_eval, _ = hoge(attacks_with_proba=next_attacks,
+                                  candidate_hands_list=filtered, opponents=opponents_sim, player=player)
+
+        if p == 1:
+            value = descendant_eval
+        else:
+            value = p * (- np.log(p) + descendant_eval) + (1-p)*(-np.log(1-p))
+        if max_eval <= value:
+            max_eval = value
+            max_attack = attack
+    return max_eval, max_attack
+
+
+def transform_candidates_from_hand_to_attack(candidate_hands_list, opponents, player):
+    # get attacks with probability
+    counter: Dict[Tuple[int, int], Dict[str, int]
+                  ] = defaultdict(lambda: defaultdict(int))
+    for sim_hands_list in candidate_hands_list:
+        for opponent_id, sim_hands in sim_hands_list:
+            for position, card in enumerate(sim_hands.cards):
+                counter[(opponent_id, position)][str(card.get_content())] += 1
+
+    return get_attacks_with_proba(
+        counter=counter, opponents=opponents, player=player)
 
 
 def get_attacks_with_proba(counter: Dict[Tuple[int, int], Dict[str, int]],
