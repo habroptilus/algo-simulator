@@ -4,23 +4,9 @@ import time
 from tools.card import CardContent
 from tools.card_list import Deck, Hands
 from tools.player import Player
-from tools.consts import PLAYERS_NUM
 from tools.logic import get_attack, get_attack_from_input
 from tools.attack import Attack
-
-
-def print_status(players: List[Player]) -> None:
-    player_name_len = max([len(player.name) for player in players])
-    player_hands_len = max([len(player.hands) for player in players])
-    header = " "*(player_name_len+2) + \
-        " ".join([f"{str(i).rjust(3, ' ')}" for i in range(player_hands_len)])
-    title = "State"
-    upper_parts = "="*int((len(header)-len(title))/2)
-    print(upper_parts + title + upper_parts)
-    print(header)
-    for player in players:
-        print(player)
-    print("="*len(header))
+from tools.utils import print_status
 
 
 class Game:
@@ -41,6 +27,7 @@ class Game:
         human_player = self.get_human_player()
         deck = Deck(colors=self.colors, numbers=self.numbers)
         players = self.init_players(deck=deck, human_player=human_player)
+        players_num = len(self.player_id_list)
 
         history = []
         opened_cards = []
@@ -91,7 +78,7 @@ class Game:
                     # Judge whether the game is over or not
                     if attacked_player.is_loser():
                         losers += 1
-                        if losers == PLAYERS_NUM-1:
+                        if losers == players_num-1:
                             print(
                                 f"The game is over! Winner: {player.name}")
                             return player.player_id
@@ -106,7 +93,7 @@ class Game:
                 print(f"Inserted: {new_card}")
 
             # switch attacker
-            attacker = (attacker+1) % PLAYERS_NUM
+            attacker = (attacker+1) % players_num
             print("\n")
 
     def get_human_player(self) -> Optional[int]:
