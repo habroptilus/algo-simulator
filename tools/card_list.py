@@ -51,19 +51,16 @@ class SimulationHands(CardList):
 
 class Deck(CardList):
     def __init__(self, colors: List[str], numbers: List[int]):
-        cards = [Card(color=color, number=number, opened=False)
-                 for color in colors for number in numbers]
+        cards = [Card(color=color, number=number, opened=False, card_id=i+j)
+                 for i, color in enumerate(colors) for j, number in enumerate(numbers)]
         # shuffle
         self.cards: List[Card] = random.sample(cards, len(cards))
-        self.card_id = 0
 
     def draw(self, player_id: int) -> Optional[Card]:
         if len(self.cards) == 0:
             return
         card = self.cards.pop()
-        card.owned_by = player_id
-        card.card_id = self.card_id
-        self.card_id += 1
+        card = card.set_owner(player_id=player_id)
         return card
 
 
@@ -94,13 +91,13 @@ class Hands(CardList):
                 f'The attacked card is already opened: {target_card}.')
         return target_card.get_content(referred_by=attack.attacked_to) == attack.card_content
 
-    def open(self, position: int) -> 'Hands':
+    def open(self, position: int) -> Tuple['Hands', CardContent]:
         # copy
         cards = list(self.cards)
         target_card = cards[position]
         target_card = target_card.open()
         cards[position] = target_card
-        return Hands(cards=cards)
+        return Hands(cards=cards), target_card.get_content()
 
     def get_closed_cards(self) -> List[Tuple[int, int, str]]:
         return [(position, card.card_id, card.get_color()) for position, card in enumerate(self.cards) if not card.opened]

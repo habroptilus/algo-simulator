@@ -1,6 +1,7 @@
 from typing import Optional
 from tools.card_list import Hands
-from tools.card import Card
+from tools.card import Card, CardContent
+from tools.attack import Attack
 
 
 class Player:
@@ -15,7 +16,17 @@ class Player:
     def debug(self) -> str:
         return f"{self.name}: {self.hands.debug()}"
 
-    def insert(self, card: Card) -> 'Player':
-        card = card.belongs_to(self.player_id)
-        hands = self.hands.insert(card=card)
-        return Player(player_id=self.player_id, hands=hands, name=self.name)
+    def insert(self, card: Card) -> None:
+        card = card.set_owner(self.player_id)
+        inserted_hands, _ = self.hands.insert(card=card)
+        self.hands = inserted_hands
+
+    def judge(self, attack: Attack) -> bool:
+        return self.hands.judge(attack)
+
+    def open(self, position: int) -> CardContent:
+        self.hands, opened_card = self.hands.open(position=position)
+        return opened_card
+
+    def is_loser(self) -> bool:
+        return self.hands.is_loser()

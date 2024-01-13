@@ -77,34 +77,32 @@ class Game:
                 print(f"Attack: {attack}")
                 # Apply attack
                 history.append(attack)
-                opponent = players[attack.attacked_to]
+                attacked_player = players[attack.attacked_to]
                 print("Judging...")
                 time.sleep(self.sleep_seconds)
-                result = opponent.hands.judge(attack=attack)
+                result = attacked_player.judge(attack=attack)
                 if result:
                     print("Success!\n")
                     has_succeeded = True
-                    opponent.hands = opponent.hands.open(
+                    opened_card: CardContent = attacked_player.open(
                         position=attack.position)
-                    opened_cards.append(CardContent(
-                        color=attack.card_content.color, number=attack.card_content.number))
+                    opened_cards.append(opened_card)
                     print_status(players=players)
                     # Judge whether the game is over or not
-                    if opponent.hands.is_loser():
+                    if attacked_player.is_loser():
                         losers += 1
                         if losers == PLAYERS_NUM-1:
                             print(
                                 f"The game is over! Winner: {player.name}")
                             return player.player_id
-
                 else:
                     print("Failed.")
                     if new_card is not None:
-                        new_card.opened = True
+                        new_card = new_card.open()
                     break
 
             if new_card is not None:
-                player.hands, _ = player.hands.insert(new_card)
+                player.insert(new_card)
                 print(f"Inserted: {new_card}")
 
             # switch attacker

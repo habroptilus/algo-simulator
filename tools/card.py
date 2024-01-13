@@ -56,9 +56,10 @@ class Card:
         # TODO: make hash
         return self.__content
 
-    def belongs_to(self, player_id: int):
-        if self.owned_by == player_id:
-            raise Exception(f"The card is owned by {self.owned_by}")
+    def set_owner(self, player_id: int) -> 'Card':
+        if (self.owned_by is not None) and (self.owned_by != player_id):
+            raise Exception(
+                f"The card is owned by {self.owned_by}. You can't change owner.")
         return Card(color=self.__content.color, number=self.__content.number, opened=self.opened, owned_by=player_id, card_id=self.card_id)
 
     def open(self) -> 'Card':
