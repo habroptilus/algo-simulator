@@ -128,11 +128,11 @@ def get_attack(player: Player,
                history: List[Attack],
                has_succeeded: bool,
                skip_proba: float = 0
-               ) -> Optional[Attack]:
+               ) -> Tuple[Optional[Attack], Optional[float]]:
     if has_succeeded:
         if random.random() <= skip_proba:
             # skip the next attack
-            return
+            return None, None
 
             # enumerate hands candidates for opponents
     candidate_hands_list: List[List[SimulationHands]] = calculate_hand_candidates(
@@ -163,7 +163,7 @@ def get_attack(player: Player,
     # sample an attack.
     chosen_attack, proba = random.choice(attack_candidates)
     print(f"Probability of Success: {int(proba*100):.1f}%")
-    return chosen_attack
+    return chosen_attack, proba
 
 
 def get_attacks_with_proba(counter: Dict[Tuple[int, int], Dict[str, int]],
