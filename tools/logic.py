@@ -127,31 +127,19 @@ def get_attack(player: Player,
                opened_cards: List[CardContent],
                history: List[Attack],
                has_succeeded: bool,
+               skip_proba: float = 0
                ) -> Optional[Attack]:
+    if has_succeeded:
+        if random.random() <= skip_proba:
+            # skip the next attack
+            return
 
-    # estimate reward if new card were inserted with being closed.
-    estimated_reward_for_skip = simulate_if_insert_directly(
-        new_card=new_card, player=player, opened_cards=opened_cards, history=history)
-    print(f"Estimated reward for skip: {estimated_reward_for_skip}")
-
-    # enumerate hands candidates for opponents
+            # enumerate hands candidates for opponents
     candidate_hands_list: List[List[SimulationHands]] = calculate_hand_candidates(
         player=player, opened_cards=opened_cards, new_card=new_card,
         opponents=opponents, history=history)
 
     print(f"Hand candidates: {len(candidate_hands_list)}")
-
-    # Decide strategy by using values above.
-    if len(candidate_hands_list) <= 5:
-        # about to win
-        strategy = 'attack'
-    elif estimated_reward_for_skip > 5:
-        # big reward if skipped
-        if has_succeeded:
-            return
-        strategy = 'defense'
-    else:
-        strategy = 'attack'
 
     # get attacks with probability
     counter: Dict[Tuple[int, int], Dict[str, int]
@@ -164,23 +152,17 @@ def get_attack(player: Player,
     attacks_with_proba = get_attacks_with_proba(
         counter=counter, opponents=opponents, player=player)
 
-    print(f"Attack candidates: {len(attacks_with_proba)}")
+    print(f"Attack candidates (Overall): {len(attacks_with_proba)}")
 
-    # filter attacks based on strategy and their probabilities.
-    if strategy == 'attack':
-        # Maxize entropy to decrease the number of candidates
-        attack_candidates = get_attacks_with_target_proba(
-            attack_candidates=attacks_with_proba, target_proba=0.5)
-    elif strategy == 'defense':
-        # Maximize success probability to skip the next attack.
-        attack_candidates = get_attacks_with_target_proba(
-            attack_candidates=attacks_with_proba, target_proba=1)
-    else:
-        raise Exception(f"Invalid strategy: {strategy}")
+    # choose attacks to maxmize success probability
+    attack_candidates = get_attacks_with_target_proba(
+        attack_candidates=attacks_with_proba, target_proba=1)
+
+    print(f"Attack candidates: {len(attack_candidates)}")
 
     # sample an attack.
     chosen_attack, proba = random.choice(attack_candidates)
-    print(f"Max probability: {int(proba*100):.1f}%")
+    print(f"Probability of Success: {int(proba*100):.1f}%")
     return chosen_attack
 
 
