@@ -31,6 +31,7 @@ class Game:
 
         history = []
         opened_cards = []
+        different_between_strategies_list = []
         losers = 0
         attacker = self.start_attacker
         outputs = {"proba_list": [], "attack_results": []}
@@ -51,11 +52,19 @@ class Game:
 
             has_succeeded = False
             strategies = [True, True]
+
             while True:
                 maximize_entropy_strategy = strategies[player.player_id]
-                attack, proba = self.act(human_player=human_player, player=player, opponents=opponents,
-                                         new_card_content=new_card_content, has_succeeded=has_succeeded,
-                                         opened_cards=opened_cards, history=history, maximize_entropy_strategy=maximize_entropy_strategy)
+                attack, meta = self.act(human_player=human_player, player=player, opponents=opponents,
+                                        new_card_content=new_card_content, has_succeeded=has_succeeded,
+                                        opened_cards=opened_cards, history=history, maximize_entropy_strategy=maximize_entropy_strategy)
+                proba = meta["proba"]
+
+                different_between_strategies = meta.get(
+                    "different_between_strategies")
+                if different_between_strategies is not None:
+                    different_between_strategies_list.append(
+                        different_between_strategies)
 
                 if attack is None:
                     if not has_succeeded:
@@ -89,6 +98,7 @@ class Game:
                             outputs["history"] = history
                             outputs["winner"] = player.player_id
                             outputs["turns"] = turn
+                            outputs["different_between_strategies_list"] = different_between_strategies_list
                             return outputs
                 else:
                     print("Failed.")
@@ -120,15 +130,15 @@ class Game:
 
     def act(self, human_player: int, player: Player, opponents: List[Player],
             new_card_content: Optional[CardContent], has_succeeded: bool,
-            opened_cards: List[CardContent], history: List[Attack], maximize_entropy_strategy: bool) -> Tuple[Optional[Attack], Optional[float]]:
+            opened_cards: List[CardContent], history: List[Attack], maximize_entropy_strategy: bool) -> Tuple[Optional[Attack], Optional[Dict[str, Any]]]:
         if (human_player is not None) and (player.player_id == human_player):
             attack = get_attack_from_input(
                 player=player, opponents=opponents, new_card=new_card_content, has_succeeded=has_succeeded)
-            proba = None
+            meta = None
         else:
             print("Thinking...")
             time.sleep(self.sleep_seconds)
-            attack, proba = get_attack(
+            attack, meta = get_attack(
                 player=player,
                 opponents=opponents,
                 new_card=new_card_content,
@@ -137,7 +147,7 @@ class Game:
                 history=history,
                 maximize_entropy_strategy=maximize_entropy_strategy
             )
-        return attack, proba
+        return attack, meta
 
     def init_player(self, deck: Deck, player_id: int, name: str) -> Player:
         hands = Hands(cards=[deck.draw(player_id=player_id)

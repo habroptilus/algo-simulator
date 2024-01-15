@@ -6,7 +6,7 @@ from tools.card_list import SimulationHands
 import random
 from collections import defaultdict
 from tools.consts import NUMBERS
-from typing import List, Optional, Tuple, Dict
+from typing import List, Optional, Tuple, Dict, Any
 import numpy as np
 import copy
 
@@ -130,13 +130,13 @@ def get_attack(player: Player,
                has_succeeded: bool,
                skip_proba: float = 0,
                maximize_entropy_strategy: bool = True,
-               ) -> Tuple[Optional[Attack], Optional[float]]:
+               ) -> Tuple[Optional[Attack], Optional[Dict[str, Any]]]:
     if has_succeeded:
         if random.random() <= skip_proba:
             # skip the next attack
             return None, None
-
-            # enumerate hands candidates for opponents
+    meta = {}
+    # enumerate hands candidates for opponents
     candidate_hands_list: List[List[SimulationHands]] = calculate_hand_candidates(
         player=player, opened_cards=opened_cards, new_card=new_card,
         opponents=opponents, history=history)
@@ -152,6 +152,8 @@ def get_attack(player: Player,
     if len(attacks_with_proba_equals_to_1) > 0:
         # prioritize attacks with probability = 1.
         attack_candidates = attacks_with_proba_equals_to_1
+        if maximize_entropy_strategy:
+            meta["different_between_strategies"] = False
     elif maximize_entropy_strategy:
         print("Maximize entropy.")
         attack_candidates, entropy = maximize_entropy(attacks_with_proba=attacks_with_proba,
@@ -159,8 +161,12 @@ def get_attack(player: Player,
         print(f"Entropy: {entropy:.2f}")
         maximize_proba_results, _ = maximaize_probability(
             attack_candidates=attacks_with_proba)
-        assert set(maximize_proba_results) <= set(attack_candidates), (
-            attack_candidates, maximize_proba_results)
+        if not(set(maximize_proba_results) <= set(attack_candidates)):
+            print(f"Strategy entropy : {attack_candidates}")
+            print(f"Strategy probability : {maximize_proba_results}")
+            meta["different_between_strategies"] = True
+        else:
+            meta["different_between_strategies"] = False
     else:
         print("Maxmize probability.")
         attack_candidates, proba = maximaize_probability(
@@ -173,7 +179,8 @@ def get_attack(player: Player,
     # sample an attack.
     chosen_attack, chosen_proba = random.choice(attack_candidates)
     print(f"Probability of Success: {int(chosen_proba*100):.1f}%")
-    return chosen_attack, chosen_proba
+    meta["proba"] = chosen_proba
+    return chosen_attack, meta
 
 
 def maximize_entropy(attacks_with_proba, candidate_hands_list, opponents, player) -> Tuple[Optional[List[Tuple[Attack, float]]], float]:
