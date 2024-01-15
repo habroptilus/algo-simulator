@@ -50,10 +50,12 @@ class Game:
                     referred_by=player.player_id)
 
             has_succeeded = False
+            strategies = [True, False]
             while True:
+                maximize_entropy_strategy = strategies[player.player_id]
                 attack, proba = self.act(human_player=human_player, player=player, opponents=opponents,
                                          new_card_content=new_card_content, has_succeeded=has_succeeded,
-                                         opened_cards=opened_cards, history=history)
+                                         opened_cards=opened_cards, history=history, maximize_entropy_strategy=maximize_entropy_strategy)
 
                 if attack is None:
                     if not has_succeeded:
@@ -118,7 +120,7 @@ class Game:
 
     def act(self, human_player: int, player: Player, opponents: List[Player],
             new_card_content: Optional[CardContent], has_succeeded: bool,
-            opened_cards: List[CardContent], history: List[Attack]) -> Tuple[Optional[Attack], Optional[float]]:
+            opened_cards: List[CardContent], history: List[Attack], maximize_entropy_strategy: bool) -> Tuple[Optional[Attack], Optional[float]]:
         if (human_player is not None) and (player.player_id == human_player):
             attack = get_attack_from_input(
                 player=player, opponents=opponents, new_card=new_card_content, has_succeeded=has_succeeded)
@@ -133,6 +135,7 @@ class Game:
                 opened_cards=opened_cards,
                 has_succeeded=has_succeeded,
                 history=history,
+                maximize_entropy_strategy=maximize_entropy_strategy
             )
         return attack, proba
 

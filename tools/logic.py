@@ -36,10 +36,10 @@ def maximaize_probability(attack_candidates: List[Tuple[Attack, float]]) -> Tupl
     attacks = []
     for attack, proba in attack_candidates:
         if max_proba < proba:
-            attacks = [attack]
+            attacks = [(attack, proba)]
             max_proba = proba
         elif abs(max_proba - proba) <= 0.0001:
-            attacks.append(attack)
+            attacks.append((attack, proba))
     return attacks, max_proba
 
 
@@ -147,10 +147,12 @@ def get_attack(player: Player,
     print(f"Attack candidates (Overall): {len(attacks_with_proba)}")
 
     if maximize_entropy_strategy:
+        print("Maximize entropy.")
         attack_candidates, entropy = maximize_entropy(attacks_with_proba=attacks_with_proba,
                                                       candidate_hands_list=candidate_hands_list, opponents=opponents, player=player)
         print(f"Entropy: {entropy:.2f}")
     else:
+        print("Maxmize probability.")
         attack_candidates, proba = maximaize_probability(
             attack_candidates=attacks_with_proba)
         print(f"Probability: {proba:.2f}")
@@ -159,9 +161,9 @@ def get_attack(player: Player,
     print(f"Attack candidates: {len(attack_candidates)}")
 
     # sample an attack.
-    chosen_attack, proba = random.choice(attack_candidates)
-    print(f"Probability of Success: {int(proba*100):.1f}%")
-    return chosen_attack, proba
+    chosen_attack, chosen_proba = random.choice(attack_candidates)
+    print(f"Probability of Success: {int(chosen_proba*100):.1f}%")
+    return chosen_attack, chosen_proba
 
 
 def maximize_entropy(attacks_with_proba, candidate_hands_list, opponents, player) -> Tuple[Optional[List[Tuple[Attack, float]]], float]:
