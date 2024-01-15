@@ -31,17 +31,16 @@ def get_bounds(opened_cards: List[Tuple[int, CardContent]], target: int) -> Tupl
     return lower_bound, upper_bound
 
 
-def get_attacks_with_target_proba(attack_candidates: List[Tuple[Attack, float]], target_proba: float) -> List[Tuple[Attack, float]]:
-    min_diff = 10
-    results = []
+def maximaize_probability(attack_candidates: List[Tuple[Attack, float]]) -> Tuple[List[Attack], float]:
+    max_proba = 0
+    attacks = []
     for attack, proba in attack_candidates:
-        diff = abs(target_proba-proba)
-        if diff < min_diff:
-            results = [(attack, proba)]
-            min_distance = diff
-        if abs(diff - min_distance) <= 0.0001:
-            results.append((attack, proba))
-    return results
+        if max_proba < proba:
+            attacks = [attack]
+            max_proba = proba
+        elif abs(max_proba - proba) <= 0.0001:
+            attacks.append(attack)
+    return attacks, max_proba
 
 
 def apply_filters(color: str, impossible_cards: List[CardContent],
@@ -129,7 +128,8 @@ def get_attack(player: Player,
                opened_cards: List[CardContent],
                history: List[Attack],
                has_succeeded: bool,
-               skip_proba: float = 0
+               skip_proba: float = 0,
+               maximize_entropy_strategy: bool = True,
                ) -> Tuple[Optional[Attack], Optional[float]]:
     if has_succeeded:
         if random.random() <= skip_proba:
@@ -144,15 +144,18 @@ def get_attack(player: Player,
     attacks_with_proba = transform_candidates_from_hand_to_attack(
         candidate_hands_list=candidate_hands_list, opponents=opponents, player=player)
     print(f"Hand candidates: {len(candidate_hands_list)}")
-
     print(f"Attack candidates (Overall): {len(attacks_with_proba)}")
-    max_eval, max_attack = hoge(attacks_with_proba=attacks_with_proba,
-                                candidate_hands_list=candidate_hands_list, opponents=opponents, player=player)
-    print(f"Evaluation:{max_eval}, Attack: {max_attack}")
-    # choose attacks to maxmize success probability
-    attack_candidates = get_attacks_with_target_proba(
-        attack_candidates=attacks_with_proba, target_proba=1)
 
+    if maximize_entropy_strategy:
+        attack_candidates, entropy = maximize_entropy(attacks_with_proba=attacks_with_proba,
+                                                      candidate_hands_list=candidate_hands_list, opponents=opponents, player=player)
+        print(f"Entropy: {entropy:.2f}")
+    else:
+        attack_candidates, proba = maximaize_probability(
+            attack_candidates=attacks_with_proba)
+        print(f"Probability: {proba:.2f}")
+
+    # choose attacks to maxmize success probability
     print(f"Attack candidates: {len(attack_candidates)}")
 
     # sample an attack.
@@ -161,11 +164,11 @@ def get_attack(player: Player,
     return chosen_attack, proba
 
 
-def hoge(attacks_with_proba, candidate_hands_list, opponents, player):
+def maximize_entropy(attacks_with_proba, candidate_hands_list, opponents, player) -> Tuple[Optional[List[Tuple[Attack, float]]], float]:
     if len(attacks_with_proba) == 0:
-        return 0, None
+        return None, 0
     max_eval = 0
-    max_attack = None
+    max_attacks = []
     for attack, p in attacks_with_proba:
         filtered = [
             candidate_hands for candidate_hands in candidate_hands_list for opponent, hands in candidate_hands
@@ -180,17 +183,20 @@ def hoge(attacks_with_proba, candidate_hands_list, opponents, player):
         next_attacks = transform_candidates_from_hand_to_attack(
             candidate_hands_list=filtered, opponents=opponents_sim, player=player)
 
-        descendant_eval, _ = hoge(attacks_with_proba=next_attacks,
-                                  candidate_hands_list=filtered, opponents=opponents_sim, player=player)
+        _, descendant_eval = maximize_entropy(attacks_with_proba=next_attacks,
+                                              candidate_hands_list=filtered, opponents=opponents_sim, player=player)
 
         if p == 1:
             value = descendant_eval
         else:
             value = p * (- np.log(p) + descendant_eval) + (1-p)*(-np.log(1-p))
-        if max_eval <= value:
+
+        if max_eval < value:
             max_eval = value
-            max_attack = attack
-    return max_eval, max_attack
+            max_attacks = [(attack, p)]
+        elif max_eval == value:
+            max_attacks.append((attack, p))
+    return max_attacks, max_eval
 
 
 def transform_candidates_from_hand_to_attack(candidate_hands_list, opponents, player):
