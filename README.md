@@ -69,4 +69,7 @@ Calib: 1.0122384233568549
 
 Win rate of Player1: 0.44
 Calib: 1.030634393716993
+
+Win rate of Player1: 0.56
+Calib: 0.9648813762882121
 ```

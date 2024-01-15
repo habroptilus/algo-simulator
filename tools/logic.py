@@ -146,11 +146,21 @@ def get_attack(player: Player,
     print(f"Hand candidates: {len(candidate_hands_list)}")
     print(f"Attack candidates (Overall): {len(attacks_with_proba)}")
 
-    if maximize_entropy_strategy:
+    attacks_with_proba_equals_to_1 = [
+        (attack, proba) for attack, proba in attacks_with_proba if proba == 1]
+
+    if len(attacks_with_proba_equals_to_1) > 0:
+        # prioritize attacks with probability = 1.
+        attack_candidates = attacks_with_proba_equals_to_1
+    elif maximize_entropy_strategy:
         print("Maximize entropy.")
         attack_candidates, entropy = maximize_entropy(attacks_with_proba=attacks_with_proba,
                                                       candidate_hands_list=candidate_hands_list, opponents=opponents, player=player)
         print(f"Entropy: {entropy:.2f}")
+        maximize_proba_results, _ = maximaize_probability(
+            attack_candidates=attacks_with_proba)
+        assert set(maximize_proba_results) <= set(attack_candidates), (
+            attack_candidates, maximize_proba_results)
     else:
         print("Maxmize probability.")
         attack_candidates, proba = maximaize_probability(
@@ -185,19 +195,21 @@ def maximize_entropy(attacks_with_proba, candidate_hands_list, opponents, player
         next_attacks = transform_candidates_from_hand_to_attack(
             candidate_hands_list=filtered, opponents=opponents_sim, player=player)
 
-        _, descendant_eval = maximize_entropy(attacks_with_proba=next_attacks,
-                                              candidate_hands_list=filtered, opponents=opponents_sim, player=player)
+        _, descendant_entropy = maximize_entropy(attacks_with_proba=next_attacks,
+                                                 candidate_hands_list=filtered, opponents=opponents_sim, player=player)
 
         if p == 1:
-            value = descendant_eval
+            entropy = descendant_entropy
         else:
-            value = p * (- np.log(p) + descendant_eval) + (1-p)*(-np.log(1-p))
+            entropy = p * (- np.log(p) + descendant_entropy) + \
+                (1-p)*(-np.log(1-p))
 
-        if max_eval < value:
-            max_eval = value
+        if max_eval < entropy:
+            max_eval = entropy
             max_attacks = [(attack, p)]
-        elif max_eval == value:
+        elif abs(max_eval-entropy) < 0.0001:
             max_attacks.append((attack, p))
+
     return max_attacks, max_eval
 
 

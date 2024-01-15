@@ -50,7 +50,7 @@ class Game:
                     referred_by=player.player_id)
 
             has_succeeded = False
-            strategies = [True, False]
+            strategies = [True, True]
             while True:
                 maximize_entropy_strategy = strategies[player.player_id]
                 attack, proba = self.act(human_player=human_player, player=player, opponents=opponents,
