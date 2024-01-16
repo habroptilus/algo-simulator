@@ -31,7 +31,6 @@ class Game:
 
         history = []
         opened_cards = []
-        different_between_strategies_list = []
         losers = 0
         attacker = self.start_attacker
         outputs = {"proba_list": [], "attack_results": []}
@@ -51,20 +50,13 @@ class Game:
                     referred_by=player.player_id)
 
             has_succeeded = False
-            strategies = [True, True]
+            strategies = [False, True]
 
             while True:
                 maximize_entropy_strategy = strategies[player.player_id]
                 attack, meta = self.act(human_player=human_player, player=player, opponents=opponents,
                                         new_card_content=new_card_content, has_succeeded=has_succeeded,
                                         opened_cards=opened_cards, history=history, maximize_entropy_strategy=maximize_entropy_strategy)
-                proba = meta.get("proba")
-
-                different_between_strategies = meta.get(
-                    "different_between_strategies")
-                if different_between_strategies is not None:
-                    different_between_strategies_list.append(
-                        different_between_strategies)
 
                 if attack is None:
                     if not has_succeeded:
@@ -76,7 +68,7 @@ class Game:
                 print(f"Attack: {attack}")
                 # Apply attack
                 history.append(attack)
-                outputs["proba_list"].append(proba)
+                outputs["proba_list"].append(meta["proba"])
                 attacked_player = players[attack.attacked_to]
                 print("Judging...")
                 time.sleep(self.sleep_seconds)
@@ -98,7 +90,6 @@ class Game:
                             outputs["history"] = history
                             outputs["winner"] = player.player_id
                             outputs["turns"] = turn
-                            outputs["different_between_strategies_list"] = different_between_strategies_list
                             return outputs
                 else:
                     print("Failed.")

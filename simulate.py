@@ -21,12 +21,10 @@ if __name__ == '__main__':
         outputs = game.start()
         proba_list += outputs["proba_list"]
         attack_results += outputs["attack_results"]
-        different_between_strategies_list += outputs["different_between_strategies_list"]
         turns.append(outputs["turns"])
         winners.append(outputs["winner"])
 
     print(f"Win rate of Player1: {sum(winners)/len(winners)}")
+    assert len(proba_list) == len(attack_results)
     print(f"Calib: {sum(proba_list)/sum(attack_results)}")
     print(f"Avg turns: {sum(turns)/len(turns)}")
-    print(
-        f"Rate of difference between strategies: {sum(different_between_strategies_list)/len(different_between_strategies_list)}")

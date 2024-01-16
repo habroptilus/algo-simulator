@@ -255,7 +255,6 @@ def maximize_entropy(attacks_with_proba, candidate_hands_list, opponents, player
     if len(attacks_with_proba) == 0:
         # How do we set gain for win?
         return None, 1
-    debug = []
     max_gain = -10000000
     max_attacks = []
     entropy_opened, entropy_closed = estimate_self_entropy(candidate_hands_list=candidate_hands_list, opponents=opponents,
@@ -292,15 +291,14 @@ def maximize_entropy(attacks_with_proba, candidate_hands_list, opponents, player
 
             entropy_gain = calculate_entropy_gain(
                 p=p, descendant_entropy=descendant_entropy, entropy_opened=entropy_opened)
-        debug.append(entropy_gain)
+
         if max_gain < entropy_gain:
             max_gain = entropy_gain
             max_attacks = [(attack, p)]
         elif abs(max_gain-entropy_gain) < 0.0001:
             max_attacks.append((attack, p))
     print("> "*depth+f"{max_attacks} {max_gain} (depth={depth})")
-    if len(max_attacks) == 0:
-        raise Exception(debug)
+
     return max_attacks, max_gain
 
 
