@@ -2,7 +2,7 @@ import itertools
 from tools.player import Player
 from tools.card import CardContent, Card
 from tools.attack import Attack
-from tools.card_list import SimulationHands
+from tools.card_list import SimulationHands, Hands
 import random
 from collections import defaultdict
 from tools.consts import NUMBERS
@@ -101,7 +101,8 @@ def simulate_if_insert_directly(new_card, player, opened_cards, history):
     return len(local_candidate)
 
 
-def calculate_hand_candidates(player, opened_cards, new_card, opponents, history) -> List[List[SimulationHands]]:
+def calculate_hand_candidates(player: Player, opened_cards: List[CardContent], new_card: Optional[CardContent],
+                              opponents: List[Player], history: List[Attack]) -> List[List[SimulationHands]]:
     impossible_cards = generate_impossible_cards(
         player=player, opened_cards=opened_cards, new_card=new_card)
 
@@ -120,6 +121,48 @@ def calculate_hand_candidates(player, opened_cards, new_card, opponents, history
 
     return enumerate_candidates(
         local_candidates_list, opponent_closed_positions, opponents)
+
+
+def estimate_self_entropy(candidate_hands_list, opponents, player, opened_cards, new_card, history, opened, max_samples: int = 10):
+    entropy_list = []
+    # reduce complexty
+    sampled_hands_list = random.sample(
+        candidate_hands_list, min(max_samples, len(candidate_hands_list)))
+
+    for candidate_hands in sampled_hands_list:
+        # assume that single opponent
+        assert len(candidate_hands) == 1
+        for opponent_player_id, candidate_hand in candidate_hands:
+            print(candidate_hand)
+            # set candidate_hand to opponent
+            opponents_sim = copy.deepcopy(opponents)
+            # TODO: support multi opponents
+            opponent_sim = opponents_sim[0]
+            hands_sim = Hands(candidate_hand.cards)
+            opponent_sim.hands = hands_sim
+            # set opponent to player
+            player_sim = opponent_sim
+            # TODO: support multi opponents
+            opponents_sim = [player]
+            # calculate hand_candidates of before state
+            before_hands = calculate_hand_candidates(
+                player=player_sim, opened_cards=opened_cards, new_card=None, opponents=opponents_sim, history=history)
+            # TODO: support multi opponents
+            before_num = len(before_hands)
+            # insert card with being opened or not opened
+            card_to_be_inserted = Card(color=new_card.color,
+                                       number=new_card.number, opened=opened)
+            player_sim.insert(card=card_to_be_inserted)
+            # calculate hand_candidates of after state
+            after_hands = calculate_hand_candidates(
+                player=player_sim, opened_cards=opened_cards, new_card=None, opponents=opponents_sim, history=history)
+            # TODO: support multi opponents
+            after_num = len(after_hands)
+            print(f"{before_num} -> {after_num}")
+            entropy = np.log(before_num/after_num)
+            entropy_list.append(entropy)
+
+    return sum(entropy_list)/len(entropy_list)
 
 
 def get_attack(player: Player,
@@ -141,9 +184,14 @@ def get_attack(player: Player,
         player=player, opened_cards=opened_cards, new_card=new_card,
         opponents=opponents, history=history)
 
+    print(f"Hand candidates: {len(candidate_hands_list)}")
+    self_entropy_opened = estimate_self_entropy(candidate_hands_list=candidate_hands_list, opponents=opponents,
+                                                player=player, opened_cards=opened_cards, new_card=new_card,
+                                                history=history, opened=True)
+    print(self_entropy_opened)
     attacks_with_proba = transform_candidates_from_hand_to_attack(
         candidate_hands_list=candidate_hands_list, opponents=opponents, player=player)
-    print(f"Hand candidates: {len(candidate_hands_list)}")
+
     print(f"Attack candidates (Overall): {len(attacks_with_proba)}")
 
     attacks_with_proba_equals_to_1 = [
