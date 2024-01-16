@@ -197,9 +197,14 @@ def get_attack(player: Player,
 
     print(f"Attack candidates (Overall): {len(attacks_with_proba)}")
 
-    if maximize_entropy_strategy:
+    attacks_proba_1 = [(attack, proba)
+                       for attack, proba in attacks_with_proba if proba == 1]
+    if len(attacks_proba_1) == len(attacks_with_proba):
+        attack_candidates = attacks_with_proba
+    elif maximize_entropy_strategy:
         print("Maximize entropy.")
         # Select attacks with high probability
+        # TODO: consider more wise selection of candidates
         attacks_with_proba = select_attacks_with_high_proba(
             attacks_with_proba=attacks_with_proba, phase1_max_num=phase1_max_num)
         # if you can skip, add skip option to candidates.
@@ -248,7 +253,8 @@ def maximize_entropy(attacks_with_proba, candidate_hands_list, opponents, player
         return None, 0
 
     if len(attacks_with_proba) == 0:
-        return None, 0
+        # How do we set gain for win?
+        return None, 1
     debug = []
     max_gain = -10000000
     max_attacks = []
