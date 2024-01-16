@@ -58,7 +58,7 @@ class Game:
                 attack, meta = self.act(human_player=human_player, player=player, opponents=opponents,
                                         new_card_content=new_card_content, has_succeeded=has_succeeded,
                                         opened_cards=opened_cards, history=history, maximize_entropy_strategy=maximize_entropy_strategy)
-                proba = meta["proba"]
+                proba = meta.get("proba")
 
                 different_between_strategies = meta.get(
                     "different_between_strategies")
