@@ -16,10 +16,11 @@ class Player:
     def debug(self) -> str:
         return f"{self.name}: {self.hands.debug()}"
 
-    def insert(self, card: Card) -> None:
+    def insert(self, card: Card) -> int:
         card = card.set_owner(self.player_id)
-        inserted_hands, _ = self.hands.insert(card=card)
+        inserted_hands, position = self.hands.insert(card=card)
         self.hands = inserted_hands
+        return position
 
     def judge(self, attack: Attack) -> bool:
         return self.hands.judge(attack)

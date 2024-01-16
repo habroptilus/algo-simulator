@@ -123,46 +123,52 @@ def calculate_hand_candidates(player: Player, opened_cards: List[CardContent], n
         local_candidates_list, opponent_closed_positions, opponents)
 
 
-def estimate_self_entropy(candidate_hands_list, opponents, player, opened_cards, new_card, history, opened, max_samples: int = 10):
-    entropy_list = []
+def estimate_self_entropy(candidate_hands_list, opponents, player, opened_cards, new_card, history, max_samples: int = 1):
+    entropy_list_opened = []
+    entropy_list_closed = []
     # reduce complexty
     sampled_hands_list = random.sample(
         candidate_hands_list, min(max_samples, len(candidate_hands_list)))
 
     for candidate_hands in sampled_hands_list:
         # assume that single opponent
+        # TODO: support multi opponents
         assert len(candidate_hands) == 1
-        for opponent_player_id, candidate_hand in candidate_hands:
-            print(candidate_hand)
+        for tentative_attacker_id, tentative_hand in candidate_hands:
+            print(tentative_hand)
             # set candidate_hand to opponent
             opponents_sim = copy.deepcopy(opponents)
-            # TODO: support multi opponents
             opponent_sim = opponents_sim[0]
-            hands_sim = Hands(candidate_hand.cards)
-            opponent_sim.hands = hands_sim
-            # set opponent to player
-            player_sim = opponent_sim
-            # TODO: support multi opponents
-            opponents_sim = [player]
+            opponent_sim.hands = Hands(tentative_hand.cards)
+            # set opponent to tentative attacker
+            tentative_attacker = opponent_sim
+            # set player to original attacker
+            original_attacker = copy.copy(player)
             # calculate hand_candidates of before state
-            before_hands = calculate_hand_candidates(
-                player=player_sim, opened_cards=opened_cards, new_card=None, opponents=opponents_sim, history=history)
-            # TODO: support multi opponents
-            before_num = len(before_hands)
-            # insert card with being opened or not opened
-            card_to_be_inserted = Card(color=new_card.color,
-                                       number=new_card.number, opened=opened)
-            player_sim.insert(card=card_to_be_inserted)
-            # calculate hand_candidates of after state
-            after_hands = calculate_hand_candidates(
-                player=player_sim, opened_cards=opened_cards, new_card=None, opponents=opponents_sim, history=history)
-            # TODO: support multi opponents
-            after_num = len(after_hands)
-            print(f"{before_num} -> {after_num}")
-            entropy = np.log(before_num/after_num)
-            entropy_list.append(entropy)
+            before_num = len(calculate_hand_candidates(
+                player=tentative_attacker, opened_cards=opened_cards, new_card=None, opponents=[original_attacker], history=history))
 
-    return sum(entropy_list)/len(entropy_list)
+            # calculate hand_candidates of after state with not opened new_card
+            closed_card = Card(color=new_card.color,
+                               number=new_card.number, opened=False)
+            inserted_at = original_attacker.insert(closed_card)
+            after_num_closed = len(calculate_hand_candidates(
+                player=tentative_attacker, opened_cards=opened_cards, new_card=None, opponents=[original_attacker], history=history))
+
+            # calculate hand_candidates of after state with opened new_card
+            original_attacker.open(position=inserted_at)
+            after_num_opened = len(calculate_hand_candidates(
+                player=tentative_attacker, opened_cards=opened_cards, new_card=None, opponents=[original_attacker], history=history))
+
+            print(f"Not Open: {before_num} -> {after_num_closed}")
+            print(f"Open: {before_num} -> {after_num_opened}")
+            entropy_list_opened.append(np.log(before_num/after_num_opened))
+            entropy_list_closed.append(np.log(before_num/after_num_closed))
+
+    entropy_opened = sum(entropy_list_opened)/len(entropy_list_opened)
+    entropy_closed = sum(entropy_list_closed)/len(entropy_list_closed)
+
+    return entropy_opened, entropy_closed
 
 
 def get_attack(player: Player,
@@ -185,27 +191,20 @@ def get_attack(player: Player,
         opponents=opponents, history=history)
 
     print(f"Hand candidates: {len(candidate_hands_list)}")
-    self_entropy_opened = estimate_self_entropy(candidate_hands_list=candidate_hands_list, opponents=opponents,
-                                                player=player, opened_cards=opened_cards, new_card=new_card,
-                                                history=history, opened=True)
-    print(self_entropy_opened)
+
     attacks_with_proba = transform_candidates_from_hand_to_attack(
         candidate_hands_list=candidate_hands_list, opponents=opponents, player=player)
 
     print(f"Attack candidates (Overall): {len(attacks_with_proba)}")
 
-    attacks_with_proba_equals_to_1 = [
-        (attack, proba) for attack, proba in attacks_with_proba if proba == 1]
-
-    if len(attacks_with_proba_equals_to_1) > 0:
-        # prioritize attacks with probability = 1.
-        attack_candidates = attacks_with_proba_equals_to_1
-        if maximize_entropy_strategy:
-            meta["different_between_strategies"] = False
-    elif maximize_entropy_strategy:
+    if maximize_entropy_strategy:
         print("Maximize entropy.")
+        if has_succeeded:
+            # if you can skip, add skip option to candidates.
+            attacks_with_proba.append((None, None))
         attack_candidates, entropy = maximize_entropy(attacks_with_proba=attacks_with_proba,
-                                                      candidate_hands_list=candidate_hands_list, opponents=opponents, player=player)
+                                                      candidate_hands_list=candidate_hands_list, opponents=opponents,
+                                                      player=player, opened_cards=opened_cards, new_card=new_card, history=history)
         print(f"Entropy: {entropy:.2f}")
         maximize_proba_results, _ = maximaize_probability(
             attack_candidates=attacks_with_proba)
@@ -231,41 +230,54 @@ def get_attack(player: Player,
     return chosen_attack, meta
 
 
-def maximize_entropy(attacks_with_proba, candidate_hands_list, opponents, player) -> Tuple[Optional[List[Tuple[Attack, float]]], float]:
+def maximize_entropy(attacks_with_proba, candidate_hands_list, opponents, player,
+                     opened_cards, new_card, history) -> Tuple[Optional[List[Tuple[Attack, float]]], float]:
     if len(attacks_with_proba) == 0:
         return None, 0
-    max_eval = 0
+    max_gain = 0
     max_attacks = []
+    entropy_opened, entropy_closed = estimate_self_entropy(candidate_hands_list=candidate_hands_list, opponents=opponents,
+                                                           player=player, opened_cards=opened_cards, new_card=new_card,
+                                                           history=history)
+
     for attack, p in attacks_with_proba:
-        filtered = [
-            candidate_hands for candidate_hands in candidate_hands_list for opponent, hands in candidate_hands
-            if (opponent == attack.attacked_to) and (hands.cards[attack.position].get_content() == attack.card_content)]
-
-        # copy
-        opponents_sim = copy.deepcopy(opponents)
-        for opponent_sim in opponents_sim:
-            if opponent_sim.player_id == attack.attacked_to:
-                opponent_sim.open(position=attack.position)
-
-        next_attacks = transform_candidates_from_hand_to_attack(
-            candidate_hands_list=filtered, opponents=opponents_sim, player=player)
-
-        _, descendant_entropy = maximize_entropy(attacks_with_proba=next_attacks,
-                                                 candidate_hands_list=filtered, opponents=opponents_sim, player=player)
-
-        if p == 1:
-            entropy = descendant_entropy
+        if attack is None:
+            # the case of skip
+            entropy_gain = - entropy_closed
+            print(entropy_gain)
         else:
-            entropy = p * (- np.log(p) + descendant_entropy) + \
-                (1-p)*(-np.log(1-p))
+            filtered = [
+                candidate_hands for candidate_hands in candidate_hands_list for opponent, hands in candidate_hands
+                if (opponent == attack.attacked_to) and (hands.cards[attack.position].get_content() == attack.card_content)]
 
-        if max_eval < entropy:
-            max_eval = entropy
+            # copy
+            opponents_sim = copy.deepcopy(opponents)
+            for opponent_sim in opponents_sim:
+                if opponent_sim.player_id == attack.attacked_to:
+                    opponent_sim.open(position=attack.position)
+
+            next_attacks = transform_candidates_from_hand_to_attack(
+                candidate_hands_list=filtered, opponents=opponents_sim, player=player)
+            # Skip can be chosen after success of attacks
+            next_attacks.append((None, None))
+
+            _, descendant_entropy = maximize_entropy(attacks_with_proba=next_attacks,
+                                                     candidate_hands_list=filtered, opponents=opponents_sim,
+                                                     player=player, opened_cards=opened_cards, new_card=new_card, history=history)
+
+            if p == 1:
+                entropy_gain = descendant_entropy
+            else:
+                entropy_gain = p * (- np.log(p) + descendant_entropy) + \
+                    (1-p)*(-np.log(1-p) - entropy_opened)
+
+        if max_gain < entropy_gain:
+            max_gain = entropy_gain
             max_attacks = [(attack, p)]
-        elif abs(max_eval-entropy) < 0.0001:
+        elif abs(max_gain-entropy_gain) < 0.0001:
             max_attacks.append((attack, p))
 
-    return max_attacks, max_eval
+    return max_attacks, max_gain
 
 
 def transform_candidates_from_hand_to_attack(candidate_hands_list, opponents, player):
