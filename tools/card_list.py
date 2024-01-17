@@ -1,11 +1,11 @@
 import random
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 from tools.card import Card, CardContent
 from tools.attack import Attack
 
 
 class CardList:
-    def __init__(self, cards: List[Card]):
+    def __init__(self, cards: list[Card]):
         self.cards = cards
 
     def __repr__(self) -> str:
@@ -30,7 +30,7 @@ class CardList:
 
 
 class SimulationHands(CardList):
-    def __init__(self, cards: List[Card]):
+    def __init__(self, cards: list[Card]):
         # open all cards
         return super().__init__([card.open() if not card.opened else card for card in cards])
 
@@ -50,11 +50,11 @@ class SimulationHands(CardList):
 
 
 class Deck(CardList):
-    def __init__(self, colors: List[str], numbers: List[int]):
+    def __init__(self, colors: list[str], numbers: list[int]):
         cards = [Card(color=color, number=number, opened=False, card_id=i+j)
                  for i, color in enumerate(colors) for j, number in enumerate(numbers)]
         # shuffle
-        self.cards: List[Card] = random.sample(cards, len(cards))
+        self.cards: list[Card] = random.sample(cards, len(cards))
 
     def draw(self, player_id: int) -> Optional[Card]:
         if len(self.cards) == 0:
@@ -65,8 +65,8 @@ class Deck(CardList):
 
 
 class Hands(CardList):
-    def __init__(self, cards: List[Card]):
-        self.cards: List[Card] = sorted(cards)
+    def __init__(self, cards: list[Card]):
+        self.cards: list[Card] = sorted(cards)
 
     def insert(self, card: Card) -> Tuple['Hands', int]:
         hands = Hands(cards=self.cards + [card])
@@ -99,13 +99,13 @@ class Hands(CardList):
         cards[position] = target_card
         return Hands(cards=cards), target_card.get_content()
 
-    def get_closed_cards(self) -> List[Tuple[int, int, str]]:
+    def get_closed_cards(self) -> list[Tuple[int, int, str]]:
         return [(position, card.card_id, card.get_color()) for position, card in enumerate(self.cards) if not card.opened]
 
-    def get_opened_cards(self) -> List[Tuple[int, CardContent]]:
+    def get_opened_cards(self) -> list[Tuple[int, CardContent]]:
         return [(position, card.get_content()) for position, card in enumerate(self.cards) if card.opened]
 
-    def get_contents(self, referred_by: int) -> List[CardContent]:
+    def get_contents(self, referred_by: int) -> list[CardContent]:
         return [card.get_content(referred_by=referred_by) for card in self.cards]
 
     def is_loser(self) -> bool:

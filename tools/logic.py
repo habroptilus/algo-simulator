@@ -6,12 +6,12 @@ from tools.card_list import SimulationHands, Hands
 import random
 from collections import defaultdict
 from tools.consts import NUMBERS
-from typing import List, Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Any
 import numpy as np
 import copy
 
 
-def get_bounds(opened_cards: List[Tuple[int, CardContent]], target: int) -> Tuple[CardContent, CardContent]:
+def get_bounds(opened_cards: list[Tuple[int, CardContent]], target: int) -> Tuple[CardContent, CardContent]:
     # TODO: Update its logic to get more strict bounds.
     # e.g. In the case of "W04 B?? W?? W?? W09", candidates of B?? are "B05,B06,B07",
     # not "B05,B06,B07,B08,B09" which would be calculated by the current logic.
@@ -31,7 +31,7 @@ def get_bounds(opened_cards: List[Tuple[int, CardContent]], target: int) -> Tupl
     return lower_bound, upper_bound
 
 
-def maximaize_probability(attack_candidates: List[Tuple[Attack, float]]) -> Tuple[List[Attack], float]:
+def maximaize_probability(attack_candidates: list[Tuple[Attack, float]]) -> Tuple[list[Attack], float]:
     max_proba = 0
     attacks = []
     for attack, proba in attack_candidates:
@@ -43,7 +43,7 @@ def maximaize_probability(attack_candidates: List[Tuple[Attack, float]]) -> Tupl
     return attacks, max_proba
 
 
-def apply_filters(color: str, impossible_cards: List[CardContent],
+def apply_filters(color: str, impossible_cards: list[CardContent],
                   lower_bound: Optional[CardContent], upper_bound: Optional[CardContent]):
     candidates = [CardContent(color=color, number=number)
                   for number in NUMBERS]
@@ -59,7 +59,7 @@ def apply_filters(color: str, impossible_cards: List[CardContent],
     return [candidate for candidate in candidates if (candidate not in impossible_cards)]
 
 
-def generate_tried_cards(card_id: Optional[int], history: List[Attack]) -> List[CardContent]:
+def generate_tried_cards(card_id: Optional[int], history: list[Attack]) -> list[CardContent]:
     # Consider history.
     # Judge card's identity using card_id instead of position
     # because position is variable due to insertion.
@@ -67,7 +67,7 @@ def generate_tried_cards(card_id: Optional[int], history: List[Attack]) -> List[
             if attack.card_id == card_id]
 
 
-def generate_impossible_cards(opened_cards: List[CardContent], new_card: Optional[CardContent] = None, player: Optional[Player] = None) -> List[CardContent]:
+def generate_impossible_cards(opened_cards: list[CardContent], new_card: Optional[CardContent] = None, player: Optional[Player] = None) -> list[CardContent]:
     impossible_cards = list(opened_cards)
     if player is not None:
         owned_by_self = player.hands.get_contents(referred_by=player.player_id)
@@ -77,8 +77,8 @@ def generate_impossible_cards(opened_cards: List[CardContent], new_card: Optiona
     return impossible_cards
 
 
-def get_local_candidates(card_id: Optional[int], history: List[Attack], impossible_cards: List[CardContent],
-                         opened_cards_locally: List[CardContent], color: str, position: int) -> List[CardContent]:
+def get_local_candidates(card_id: Optional[int], history: list[Attack], impossible_cards: list[CardContent],
+                         opened_cards_locally: list[CardContent], color: str, position: int) -> list[CardContent]:
     tried_cards = generate_tried_cards(
         card_id=card_id, history=history)
     impossible_cards_locally = impossible_cards + tried_cards
@@ -101,18 +101,18 @@ def simulate_if_insert_directly(new_card, player, opened_cards, history):
     return len(local_candidate)
 
 
-def calculate_hand_candidates(player: Player, opened_cards: List[CardContent], new_card: Optional[CardContent],
-                              opponents: List[Player], history: List[Attack]) -> List[List[SimulationHands]]:
+def calculate_hand_candidates(player: Player, opened_cards: list[CardContent], new_card: Optional[CardContent],
+                              opponents: list[Player], history: list[Attack]) -> list[list[SimulationHands]]:
     impossible_cards = generate_impossible_cards(
         player=player, opened_cards=opened_cards, new_card=new_card)
 
-    opponent_closed_positions: Dict[int, List[int]] = defaultdict(list)
-    local_candidates_list: List[List[CardContent]] = []
+    opponent_closed_positions: dict[int, list[int]] = defaultdict(list)
+    local_candidates_list: list[list[CardContent]] = []
     for opponent in opponents:
         closed_cards = opponent.hands.get_closed_cards()
         opened_cards_locally = opponent.hands.get_opened_cards()
         for position, card_id, color in closed_cards:
-            local_candidates: List[CardContent] = get_local_candidates(
+            local_candidates: list[CardContent] = get_local_candidates(
                 card_id=card_id, history=history, impossible_cards=impossible_cards,
                 opened_cards_locally=opened_cards_locally, color=color, position=position)
 
@@ -171,22 +171,22 @@ def estimate_self_entropy(candidate_hands_list, opponents, player, opened_cards,
 
 
 def get_attack(player: Player,
-               opponents: List[Player],
+               opponents: list[Player],
                new_card: Optional[CardContent],
-               opened_cards: List[CardContent],
-               history: List[Attack],
+               opened_cards: list[CardContent],
+               history: list[Attack],
                has_succeeded: bool,
                skip_proba: float = 0,
                maximize_entropy_strategy: bool = True,
                phase1_max_num: int = 3
-               ) -> Tuple[Optional[Attack], Optional[Dict[str, Any]]]:
+               ) -> Tuple[Optional[Attack], Optional[dict[str, Any]]]:
     if has_succeeded:
         if random.random() <= skip_proba:
             # skip the next attack
             return None, None
     meta = {}
     # enumerate hands candidates for opponents
-    candidate_hands_list: List[List[SimulationHands]] = calculate_hand_candidates(
+    candidate_hands_list: list[list[SimulationHands]] = calculate_hand_candidates(
         player=player, opened_cards=opened_cards, new_card=new_card,
         opponents=opponents, history=history)
 
@@ -247,7 +247,7 @@ def select_attacks_with_high_proba(attacks_with_proba, phase1_max_num):
 
 
 def maximize_entropy(attacks_with_proba, candidate_hands_list, opponents, player,
-                     opened_cards, new_card, history, phase1_max_num, depth=0, max_depth=2) -> Tuple[Optional[List[Tuple[Attack, float]]], float]:
+                     opened_cards, new_card, history, phase1_max_num, depth=0, max_depth=2) -> Tuple[Optional[list[Tuple[Attack, float]]], float]:
     if depth == max_depth:
         print("> "*depth+"Recursion reached max_depth.")
         return None, 0
@@ -312,7 +312,7 @@ def calculate_entropy_gain(p, descendant_entropy, entropy_opened):
 
 def transform_candidates_from_hand_to_attack(candidate_hands_list, opponents, player):
     # get attacks with probability
-    counter: Dict[Tuple[int, int], Dict[str, int]
+    counter: dict[Tuple[int, int], dict[str, int]
                   ] = defaultdict(lambda: defaultdict(int))
     for sim_hands_list in candidate_hands_list:
         for opponent_id, sim_hands in sim_hands_list:
@@ -323,9 +323,9 @@ def transform_candidates_from_hand_to_attack(candidate_hands_list, opponents, pl
         counter=counter, opponents=opponents, player=player)
 
 
-def get_attacks_with_proba(counter: Dict[Tuple[int, int], Dict[str, int]],
-                           opponents: List[Player], player: Player) -> List[Tuple[Attack, float]]:
-    attacks_with_proba: List[Tuple[Attack, float]] = []
+def get_attacks_with_proba(counter: dict[Tuple[int, int], dict[str, int]],
+                           opponents: list[Player], player: Player) -> list[Tuple[Attack, float]]:
+    attacks_with_proba: list[Tuple[Attack, float]] = []
     for opponent in opponents:
         closed_cards = opponent.hands.get_closed_cards()
         for position, card_id, _ in closed_cards:
@@ -345,11 +345,11 @@ def get_attacks_with_proba(counter: Dict[Tuple[int, int], Dict[str, int]],
     return attacks_with_proba
 
 
-def enumerate_candidates(local_candidates_list: List[List[CardContent]],
-                         opponent_closed_positions: Dict[int, List[int]],
-                         opponents: List[Player]) -> List[List[SimulationHands]]:
+def enumerate_candidates(local_candidates_list: list[list[CardContent]],
+                         opponent_closed_positions: dict[int, list[int]],
+                         opponents: list[Player]) -> list[list[SimulationHands]]:
     fuga = list(itertools.product(*local_candidates_list))
-    results: List[List[SimulationHands]] = []
+    results: list[list[SimulationHands]] = []
     for card_contents in fuga:
         sim_hands_list = []
         for i, (opponent_id, positions) in enumerate(opponent_closed_positions.items()):
@@ -369,7 +369,7 @@ def enumerate_candidates(local_candidates_list: List[List[CardContent]],
     return results
 
 
-def get_attack_from_input(player: Player, opponents: List[Player], new_card: Optional[CardContent], has_succeeded: bool):
+def get_attack_from_input(player: Player, opponents: list[Player], new_card: Optional[CardContent], has_succeeded: bool):
     if new_card is not None:
         print(f"Draw: {new_card}")
     print(f"Your cards: {player.hands.debug()}")

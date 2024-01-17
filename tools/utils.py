@@ -1,8 +1,7 @@
-from typing import List
 from tools.player import Player
 
 
-def print_status(players: List[Player]) -> None:
+def print_status(players: list[Player]) -> None:
     player_name_len = max([len(player.name) for player in players])
     player_hands_len = max([len(player.hands) for player in players])
     header = " "*(player_name_len+2) + \
