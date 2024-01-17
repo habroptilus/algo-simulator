@@ -151,6 +151,8 @@ def estimate_self_entropy(candidate_hands_list, opponents, player, opened_cards,
             closed_card = Card(color=new_card.color,
                                number=new_card.number, opened=False)
             inserted_at = original_attacker.insert(closed_card)
+            # TODO: sample card for new_card. new_card is another source of information.
+            # Without it, the estimation accuracy may be bad.
             after_num_closed = len(calculate_hand_candidates(
                 player=tentative_attacker, opened_cards=opened_cards, new_card=None, opponents=[original_attacker], history=history))
 
@@ -279,9 +281,11 @@ def maximize_entropy(attacks_with_proba, candidate_hands_list, opponents, player
             next_attacks = select_attacks_with_high_proba(
                 attacks_with_proba=next_attacks, phase1_max_num=phase1_max_num)
 
-            if len(next_attacks) == 0:
+            attacks_with_proba_equals_to_1 = [
+                (attack, proba) for attack, proba in next_attacks if proba == 1]
+            if len(next_attacks) == 0 or len(attacks_with_proba_equals_to_1) == len(next_attacks):
                 # How do we set gain for win?
-                descendant_entropy = 1
+                descendant_entropy = 10
             else:
                 # Skip can be chosen after success of attacks
                 next_attacks.append((None, None))
