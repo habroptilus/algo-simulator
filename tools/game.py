@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Any
 import random
 import time
 from tools.card import CardContent
@@ -10,8 +10,8 @@ from tools.utils import print_status
 
 
 class Game:
-    def __init__(self, colors: List[str], numbers: List[int], max_turns: int,
-                 start_attacker: int,  max_hands: int, player_id_list: List[int],
+    def __init__(self, colors: list[str], numbers: list[int], max_turns: int,
+                 start_attacker: int,  max_hands: int, player_id_list: list[int],
                  include_human_player: bool, human_player: Optional[int] = None, sleep_seconds: int = 3):
         self.colors = colors
         self.numbers = numbers
@@ -23,7 +23,7 @@ class Game:
         self.include_human_player = include_human_player
         self.sleep_seconds = sleep_seconds
 
-    def start(self) -> Optional[Dict[str, Any]]:
+    def start(self) -> Optional[dict[str, Any]]:
         human_player = self.get_human_player()
         deck = Deck(colors=self.colors, numbers=self.numbers)
         players = self.init_players(deck=deck, human_player=human_player)
@@ -50,7 +50,7 @@ class Game:
                     referred_by=player.player_id)
 
             has_succeeded = False
-            strategies = [False, True]
+            strategies = [True, False]
 
             while True:
                 maximize_entropy_strategy = strategies[player.player_id]
@@ -119,9 +119,9 @@ class Game:
             print("Any Human player doesn't join this game.")
         return human_player
 
-    def act(self, human_player: int, player: Player, opponents: List[Player],
+    def act(self, human_player: int, player: Player, opponents: list[Player],
             new_card_content: Optional[CardContent], has_succeeded: bool,
-            opened_cards: List[CardContent], history: List[Attack], maximize_entropy_strategy: bool) -> Tuple[Optional[Attack], Optional[Dict[str, Any]]]:
+            opened_cards: list[CardContent], history: list[Attack], maximize_entropy_strategy: bool) -> Tuple[Optional[Attack], Optional[dict[str, Any]]]:
         if (human_player is not None) and (player.player_id == human_player):
             attack = get_attack_from_input(
                 player=player, opponents=opponents, new_card=new_card_content, has_succeeded=has_succeeded)
@@ -145,8 +145,8 @@ class Game:
                              for _ in range(self.max_hands)])
         return Player(player_id=player_id, hands=hands, name=name)
 
-    def init_players(self, deck: Deck, human_player: Optional[int]) -> List[Player]:
-        players: List[Player] = []
+    def init_players(self, deck: Deck, human_player: Optional[int]) -> list[Player]:
+        players: list[Player] = []
         cpu_num = 1
         for player_id in self.player_id_list:
             if (human_player is not None) and (player_id == human_player):

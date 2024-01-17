@@ -252,9 +252,6 @@ def maximize_entropy(attacks_with_proba, candidate_hands_list, opponents, player
         print("> "*depth+"Recursion reached max_depth.")
         return None, 0
 
-    if len(attacks_with_proba) == 0:
-        # How do we set gain for win?
-        return None, 1
     max_gain = -10000000
     max_attacks = []
     entropy_opened, entropy_closed = estimate_self_entropy(candidate_hands_list=candidate_hands_list, opponents=opponents,
@@ -281,13 +278,17 @@ def maximize_entropy(attacks_with_proba, candidate_hands_list, opponents, player
                 candidate_hands_list=filtered, opponents=opponents_sim, player=player)
             next_attacks = select_attacks_with_high_proba(
                 attacks_with_proba=next_attacks, phase1_max_num=phase1_max_num)
-            # Skip can be chosen after success of attacks
-            next_attacks.append((None, None))
 
-            _, descendant_entropy = maximize_entropy(attacks_with_proba=next_attacks,
-                                                     candidate_hands_list=filtered, opponents=opponents_sim,
-                                                     player=player, opened_cards=opened_cards, new_card=new_card,
-                                                     history=history, depth=depth+1, phase1_max_num=phase1_max_num)
+            if len(next_attacks) == 0:
+                # How do we set gain for win?
+                descendant_entropy = 1
+            else:
+                # Skip can be chosen after success of attacks
+                next_attacks.append((None, None))
+                _, descendant_entropy = maximize_entropy(attacks_with_proba=next_attacks,
+                                                         candidate_hands_list=filtered, opponents=opponents_sim,
+                                                         player=player, opened_cards=opened_cards, new_card=new_card,
+                                                         history=history, depth=depth+1, phase1_max_num=phase1_max_num)
 
             entropy_gain = calculate_entropy_gain(
                 p=p, descendant_entropy=descendant_entropy, entropy_opened=entropy_opened)
