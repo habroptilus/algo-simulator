@@ -14,6 +14,7 @@ if __name__ == '__main__':
     attack_results = []
     different_between_strategies_list = []
     turns = []
+    skip_counts = []
     game = Game(
         colors=COLORS, numbers=NUMBERS, max_turns=MAX_TURNS, start_attacker=START_ATTACKER,
         max_hands=MAX_HANDS, player_id_list=PLAYER_ID_LIST, include_human_player=False, sleep_seconds=0)
@@ -23,8 +24,10 @@ if __name__ == '__main__':
         attack_results += outputs["attack_results"]
         turns.append(outputs["turns"])
         winners.append(outputs["winner"])
+        skip_counts.append(outputs["skip_count"])
 
     print(f"Win rate of Player1: {sum(winners)/len(winners)}")
     assert len(proba_list) == len(attack_results)
     print(f"Calib: {sum(proba_list)/sum(attack_results)}")
     print(f"Avg turns: {sum(turns)/len(turns)}")
+    print(skip_counts)

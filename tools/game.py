@@ -33,7 +33,8 @@ class Game:
         opened_cards = []
         losers = 0
         attacker = self.start_attacker
-        outputs = {"proba_list": [], "attack_results": []}
+        outputs = {"proba_list": [],
+                   "attack_results": [], "skip_count": [0, 0]}
         for turn in range(1, self.max_turns + 1):
             print_status(players)
             player = players[attacker]
@@ -51,18 +52,22 @@ class Game:
 
             has_succeeded = False
             strategies = [True, False]
+            skip_probas = [0, 0]
 
             while True:
                 maximize_entropy_strategy = strategies[player.player_id]
+                skip_proba = skip_probas[player.player_id]
                 attack, meta = self.act(human_player=human_player, player=player, opponents=opponents,
                                         new_card_content=new_card_content, has_succeeded=has_succeeded,
-                                        opened_cards=opened_cards, history=history, maximize_entropy_strategy=maximize_entropy_strategy)
+                                        opened_cards=opened_cards, history=history,
+                                        maximize_entropy_strategy=maximize_entropy_strategy, skip_proba=skip_proba)
 
                 if attack is None:
                     if not has_succeeded:
                         raise Exception(
                             "You can't skip your next attack because your attack has not succeeded yet.")
                     print("Skip the next attack.")
+                    outputs["skip_count"][player.player_id] += 1
                     break
 
                 print(f"Attack: {attack}")
@@ -121,7 +126,8 @@ class Game:
 
     def act(self, human_player: int, player: Player, opponents: list[Player],
             new_card_content: Optional[CardContent], has_succeeded: bool,
-            opened_cards: list[CardContent], history: list[Attack], maximize_entropy_strategy: bool) -> Tuple[Optional[Attack], Optional[dict[str, Any]]]:
+            opened_cards: list[CardContent], history: list[Attack],
+            maximize_entropy_strategy: bool, skip_proba: float) -> Tuple[Optional[Attack], Optional[dict[str, Any]]]:
         if (human_player is not None) and (player.player_id == human_player):
             attack = get_attack_from_input(
                 player=player, opponents=opponents, new_card=new_card_content, has_succeeded=has_succeeded)
@@ -136,7 +142,8 @@ class Game:
                 opened_cards=opened_cards,
                 has_succeeded=has_succeeded,
                 history=history,
-                maximize_entropy_strategy=maximize_entropy_strategy
+                maximize_entropy_strategy=maximize_entropy_strategy,
+                skip_proba=skip_proba
             )
         return attack, meta
 

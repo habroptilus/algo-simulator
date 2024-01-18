@@ -89,18 +89,6 @@ def get_local_candidates(card_id: Optional[int], history: list[Attack], impossib
                          lower_bound=lower_bound, upper_bound=upper_bound)
 
 
-def simulate_if_insert_directly(new_card, player, opened_cards, history):
-    card = Card(color=new_card.color, number=new_card.number,
-                opened=False)
-    inserted_hands, position = player.hands.insert(card=card)
-    impossible_cards = generate_impossible_cards(opened_cards=opened_cards)
-    opened_cards_locally = inserted_hands.get_opened_cards()
-    local_candidate = get_local_candidates(
-        card_id=None, history=history, impossible_cards=impossible_cards,
-        opened_cards_locally=opened_cards_locally, color=card.get_color(), position=position)
-    return len(local_candidate)
-
-
 def calculate_hand_candidates(player: Player, opened_cards: list[CardContent], new_card: Optional[CardContent],
                               opponents: list[Player], history: list[Attack]) -> list[list[SimulationHands]]:
     impossible_cards = generate_impossible_cards(
@@ -153,14 +141,14 @@ def estimate_self_entropy(candidate_hands_list, opponents, player, opened_cards,
             inserted_at = original_attacker.insert(closed_card)
             # TODO: sample card for new_card. new_card is another source of information.
             # Without it, the estimation accuracy may be bad.
-            after_num_closed = len(calculate_hand_candidates(
-                player=tentative_attacker, opened_cards=opened_cards, new_card=None, opponents=[original_attacker], history=history))
-
-            # calculate hand_candidates of after state with opened new_card
-            original_attacker.open(position=inserted_at)
-            after_num_opened = len(calculate_hand_candidates(
-                player=tentative_attacker, opened_cards=opened_cards, new_card=None, opponents=[original_attacker], history=history))
-
+            after_closed_candidates = calculate_hand_candidates(
+                player=tentative_attacker, opened_cards=opened_cards, new_card=None, opponents=[original_attacker], history=history)
+            after_num_closed = len(after_closed_candidates)
+            after_num_opened = 0
+            for hands_list in after_closed_candidates:
+                assert len(hands_list) == 1, hands_list
+                if hands_list[0][1].cards[inserted_at].get_content() == new_card:
+                    after_num_opened += 1
             # print(f"Not Open: {before_num} -> {after_num_closed}")
             # print(f"Open: {before_num} -> {after_num_opened}")
             entropy_list_opened.append(np.log(before_num/after_num_opened))
@@ -182,7 +170,7 @@ def get_attack(player: Player,
                maximize_entropy_strategy: bool = True,
                phase1_max_num: int = 3
                ) -> Tuple[Optional[Attack], Optional[dict[str, Any]]]:
-    if has_succeeded:
+    if has_succeeded and (not maximize_entropy_strategy):
         if random.random() <= skip_proba:
             # skip the next attack
             return None, None
