@@ -24,8 +24,9 @@ class LogicBase(ABC):
 
 
 class EpsilonGreedy(LogicBase):
-    def __init__(self, epsilon: float = 0):
+    def __init__(self, epsilon: float = 0, name: Optional[str] = None):
         self.epsilon = epsilon
+        self.name = f"e_greedy(e={epsilon})" if name is None else name
 
     def act(self, player: Player,
             opponents: list[Player],
@@ -65,9 +66,11 @@ class EpsilonGreedy(LogicBase):
 
 
 class MaxEntropy(LogicBase):
-    def __init__(self,  top_proba_attacks: int = 3, max_samples: int = 1):
+    def __init__(self,  top_proba_attacks: int = 3, max_samples: int = 1,
+                 name: Optional[str] = None):
         self.top_proba_attacks = top_proba_attacks
         self.max_samples = max_samples
+        self.name = "max_entropy" if name is None else name
 
     def act(self, player: Player,
             opponents: list[Player],
@@ -121,6 +124,9 @@ class MaxEntropy(LogicBase):
 
 
 class Human(LogicBase):
+    def __init__(self, name: Optional[str] = None):
+        self.name = "human" if name is None else name
+
     def act(self, player: Player,
             opponents: list[Player],
             new_card: Optional[CardContent],
