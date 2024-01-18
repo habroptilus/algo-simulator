@@ -105,7 +105,8 @@ class MaxEntropy(LogicBase):
             attack_candidates, entropy = maximize_entropy(attacks_with_proba=attacks_with_proba,
                                                           candidate_hands_list=candidate_hands_list, opponents=opponents,
                                                           player=player, opened_cards=opened_cards,
-                                                          new_card=new_card, history=history, phase1_max_num=self.top_proba_attacks, max_samples=self.max_samples)
+                                                          new_card=new_card, history=history,
+                                                          phase1_max_num=self.top_proba_attacks, max_samples=self.max_samples)
             print(f"Entropy: {entropy:.2f}")
 
         # choose attacks to maxmize success probability
@@ -135,7 +136,7 @@ class Human(LogicBase):
                 "Enter '[position] [card]' or blank. > ").split()
             if len(inputs) == 0:
                 if has_succeeded:
-                    return
+                    return None, None
                 print(
                     "You can't skip your next attack because your attack has not succeeded yet.")
                 continue
@@ -175,7 +176,7 @@ class Human(LogicBase):
             number=number,
             attacked_to=opponent.player_id,
             attacked_by=player.player_id,
-            card_id=card_id)
+            card_id=card_id), {}
 
 
 def get_bounds(opened_cards: list[Tuple[int, CardContent]], target: int) -> Tuple[CardContent, CardContent]:

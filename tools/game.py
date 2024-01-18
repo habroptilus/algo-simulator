@@ -66,7 +66,7 @@ class Game:
                 print(f"Attack: {attack}")
                 # Apply attack
                 history.append(attack)
-                outputs["proba_list"].append(meta["proba"])
+                outputs["proba_list"].append(meta.get("proba"))
                 attacked_player = players[attack.attacked_to]
                 print("Judging...")
                 time.sleep(self.sleep_seconds)
