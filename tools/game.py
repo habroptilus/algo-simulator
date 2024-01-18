@@ -86,7 +86,7 @@ class Game:
                             print(
                                 f"The game is over! Winner: {attacker.name}")
                             outputs["history"] = history
-                            outputs["winner"] = attacker.name
+                            outputs["winner"] = attacker.player_id
                             outputs["turns"] = turn
                             return outputs
                 else:

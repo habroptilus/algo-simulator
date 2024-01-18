@@ -27,9 +27,9 @@ if __name__ == '__main__':
         winners.append(outputs["winner"])
         skip_counts.append(outputs["skip_count"])
 
-    target_player = "CPU1"
+    target_player = logics[0].name
     print(
-        f"Win rate of {target_player}: {len([winner for winner in winners if winner == target_player])/len(winners)}")
+        f"Win rate of {target_player}: {(len(winners)-sum(winners))/len(winners)}")
     assert len(proba_list) == len(attack_results)
     print(f"Calib: {sum(proba_list)/sum(attack_results)}")
     print(f"Avg turns: {sum(turns)/len(turns)}")
